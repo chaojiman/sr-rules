@@ -68,16 +68,6 @@ const prefixRules = [
   // ===== 临时规则区（改这里，用完删）=====
   'DOMAIN-SUFFIX,morphllm.com,美国',
 
-  // ===== GitHub Copilot 钉回 GitHub 组 =====
-  // AI 规则集里含这些域名，AI 已在第 2 位会抢走；前置规则可盖过
-  'DOMAIN-SUFFIX,githubcopilot.com,GitHub',
-  'DOMAIN-SUFFIX,copilot-proxy.githubusercontent.com,GitHub',
-  'DOMAIN-SUFFIX,copilot-workspace.githubnext.com,GitHub',
-  'DOMAIN-SUFFIX,copilot-telemetry.githubusercontent.com,GitHub',
-  'DOMAIN-SUFFIX,copilot-telemetry-service.githubusercontent.com,GitHub',
-  'DOMAIN-SUFFIX,copilot-stg.com,GitHub',
-  'DOMAIN-SUFFIX,copilotprodattachments.blob.core.windows.net,GitHub',
-
   // 规则集下载域名，避免出现鸡蛋问题
   'DOMAIN,cdn.jsdmirror.com,直连',
 
@@ -1162,9 +1152,11 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
 
   const orderedServiceConfigs = [
     ...serviceConfigs.filter((svc) => svc.name === 'AdBlock'),
-    // AI 提到第 2 位：antigravity/gemini 的 *.googleapis.com 必须先于 Google 命中
+    // GitHub 提前：Copilot 的 copilot* 域名在 AI 规则集里也有，GitHub 先命中即归 GitHub
+    ...serviceConfigs.filter((svc) => svc.name === 'GitHub'),
+    // AI 提前：antigravity/gemini 的 *.googleapis.com 必须先于 Google 命中
     ...serviceConfigs.filter((svc) => svc.name === 'AI'),
-    ...serviceConfigs.filter((svc) => svc.name !== 'AdBlock' && svc.name !== 'AI'),
+    ...serviceConfigs.filter((svc) => svc.name !== 'AdBlock' && svc.name !== 'GitHub' && svc.name !== 'AI'),
   ];
   for (const svc of orderedServiceConfigs) {
     if (!ruleOptionsEnable[svc.name]) continue;
