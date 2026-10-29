@@ -56,6 +56,10 @@ const DOMAIN_PATTERNS = [
   /(^|\.)alipayobjects\.com$/,
   /(^|\.)tenpay\.com$/,
   /(^|\.)tenpay\.com\.cn$/,
+  /(^|\.)qianbao\.qq\.com$/,          // QQ 钱包
+  /(^|\.)1qianbao\.com$/,             // 平安壹钱包
+  /(^|\.)payapp\.weixin\.qq\.com$/,   // 微信支付
+  /(^|\.)wx\.tenpay\.com$/,
   /(^|\.)paas\.cmbchina\.com$/,
 ];
 
