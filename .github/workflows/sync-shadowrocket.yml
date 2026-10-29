@@ -1,4 +1,4 @@
-name: sync-rules
+name: sync-shadowrocket
 
 on:
   schedule:
@@ -8,14 +8,14 @@ on:
   push:
     branches: [main]
     paths:
-      - 'build-rules.mjs'
-      - '.github/workflows/sync-rules.yml'
+      - 'scripts/build-shadowrocket.mjs'
+      - '.github/workflows/sync-shadowrocket.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: sync-rules
+  group: sync-shadowrocket
   cancel-in-progress: false
 
 jobs:
@@ -29,13 +29,13 @@ jobs:
           node-version: '20'
 
       - name: 生成规则集
-        run: node build-rules.mjs
+        run: node scripts/build-shadowrocket.mjs
 
       - name: 提交变更
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add rules
+          git add shadowrocket/rules
           if git diff --cached --quiet; then
             echo "上游无变化，跳过提交"
             exit 0

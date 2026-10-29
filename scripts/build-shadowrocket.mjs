@@ -13,7 +13,7 @@ import fs from 'fs';
 import path from 'path';
 
 const SRC = 'https://raw.githubusercontent.com/appshubcc/bett-rules/meta/geo';
-const OUT = path.resolve('rules');
+const OUT = path.resolve('shadowrocket/rules');
 
 // 输出文件名 → bett-rules geosite 分类名
 const GEOSITE = {

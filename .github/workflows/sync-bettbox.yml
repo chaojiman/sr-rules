@@ -1,4 +1,4 @@
-name: sync-bettbox-script
+name: sync-bettbox
 
 on:
   schedule:
@@ -8,15 +8,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'build-bettbox-script.mjs'
+      - 'scripts/build-bettbox.mjs'
       - 'bettbox/rules-extra.txt'
-      - '.github/workflows/sync-bettbox-script.yml'
+      - '.github/workflows/sync-bettbox.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: sync-bettbox-script
+  group: sync-bettbox
   cancel-in-progress: false
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
           node-version: '20'
 
       - name: 拉取上游并打补丁
-        run: node build-bettbox-script.mjs
+        run: node scripts/build-bettbox.mjs
 
       - name: 提交变更
         run: |
