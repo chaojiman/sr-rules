@@ -1,313 +1,298 @@
 # sr-rules
 
-一套自建的代理规则仓库：**小火箭配置** + **Bettbox 覆写脚本** + **App 去广告模块**，每天自动跟随上游更新。
+一套自建的代理规则仓库，管三件事：
 
-规则内容来自 [appshubcc/bett-rules](https://github.com/appshubcc/bett-rules)（v2fly geosite/geoip）与
-[blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script)。
+| 产物 | 给谁用 | 解决什么 |
+| --- | --- | --- |
+| [小火箭配置](shadowrocket/config.conf) | iPhone | 分流 + 去广告 |
+| [Bettbox 脚本](bettbox/mihomoScript.js) | Windows | 分流 |
+| [去广告模块](adblock/blockAds.srmodule) | iPhone | App 内广告 |
+
+全部每天自动跟随上游更新，你不用管。
 
 ---
 
-## 📦 三个产物
+## 🚀 三分钟上手
 
-| 产物 | 地址 | 用在哪 |
-| --- | --- | --- |
-| 小火箭配置 | [`shadowrocket/config.conf`](shadowrocket/config.conf) | iPhone / Shadowrocket |
-| Bettbox 脚本 | [`bettbox/mihomoScript.js`](bettbox/mihomoScript.js) | Windows / Bettbox |
-| 去广告模块 | [`adblock/blockAds.srmodule`](adblock/blockAds.srmodule) | iPhone / 小火箭 |
+### iPhone（小火箭）
 
 ```
-https://raw.githubusercontent.com/chaojiman/sr-rules/main/shadowrocket/config.conf
-https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.js
-https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds.srmodule
+第 1 步  下配置
+        小火箭 → 配置 → 右上角 + → 粘贴上面的配置地址 → 下载
+
+第 2 步  装证书（去广告才需要，只要做一次）
+        配置后面的 ⓘ → HTTPS 解密 → 生成新的 CA 证书 → 安装
+        iOS 设置 → 已下载描述文件 → 安装
+        iOS 设置 → 通用 → 关于本机 → 证书信任设置 → 打开小火箭
+
+第 3 步  装去广告模块
+        小火箭 → 模块 → 右上角 + → 粘贴模块地址
+
+第 4 步  开代理
+        首页 → 打开开关
 ```
 
-> 大陆拉不动 `raw.githubusercontent.com` 时，把 `https://raw.githubusercontent.com/chaojiman/sr-rules/main/`
+### Windows（Bettbox）
+
+```
+覆写 / 脚本设置 → 填脚本地址 → 更新 → 重连
+```
+
+### 三条地址
+
+```
+配置  https://raw.githubusercontent.com/chaojiman/sr-rules/main/shadowrocket/config.conf
+脚本  https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.js
+模块  https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds.srmodule
+```
+
+> 大陆拉不动 raw.githubusercontent.com 时，把 `https://raw.githubusercontent.com/chaojiman/sr-rules/main/`
 > 换成 `https://cdn.jsdelivr.net/gh/chaojiman/sr-rules@main/`
 
 ---
 
-## 📁 目录结构
+## 🔀 请求是怎么走的
 
-```
-sr-rules/
-├── shadowrocket/               小火箭
-│   ├── config.conf             完整配置（分组 + 规则）
-│   └── rules/*.list            22 个规则集
-├── bettbox/                    Bettbox
-│   ├── mihomoScript.js         生成的覆写脚本
-│   └── rules-extra.txt         ★ 手改这里加临时规则
-├── adblock/                    去广告
-│   └── blockAds.srmodule       生成的模块（已剔除全部金融 App）
-├── scripts/                    构建脚本
-│   ├── build-shadowrocket.mjs  上游规则集 → 小火箭格式
-│   ├── build-bettbox.mjs       上游脚本 + 补丁 → 覆写脚本
-│   └── build-adblock.mjs       上游模块 − 金融段 → 去广告模块
-├── .github/workflows/
-│   ├── sync-shadowrocket.yml   每天 03:00 重建规则集
-│   ├── sync-bettbox.yml        每天 04:00 重建脚本
-│   └── sync-adblock.yml        每天 05:00 重建模块
-└── README.md
-```
+这是两个客户端最核心的区别，也是同一份规则在小火箭上偶尔会「打不开」而 Bettbox 不会的原因。
 
----
+### 小火箭
 
-## 🔄 数据流（两条独立链）
+```mermaid
+flowchart TD
+    A([发起请求]) --> B["DNS 解析<br/>阿里 / 腾讯 DoH<br/><b>全局只有一个 DNS</b>"]
+    B --> C{"域名规则匹配<br/>从上往下，命中即停"}
 
-**链 A — 小火箭**
+    C -->|"① 广告规则<br/>ADLite + ads.list"| R1[REJECT]
+    C -->|"② 服务规则<br/>AI / GitHub / YouTube…"| R2[对应分组出口]
+    C -->|"③ 国内域名<br/>.cn / china.list / cn-direct"| R3[DIRECT]
+    C -->|"④ 未命中 ↓"| D{"global.list<br/>境外已知域名"}
 
-```
-bett-rules 上游
-   ↓  sync-shadowrocket.yml（每天 03:00）
-scripts/build-shadowrocket.mjs
-   ↓  生成
-shadowrocket/rules/*.list
-   ↓  被 URL 引用
-shadowrocket/config.conf  →  手机小火箭
+    D -->|命中| P1[漏网之鱼]
+    D -->|"未命中 ↓"| E["IP 规则<br/>cn-ip / private-ip / GEOIP,CN"]
+    E -->|"这里必须真实解析<br/>可能拿到污染 IP"| F[按 IP 归属判断]
+    F --> G[FINAL → 漏网之鱼]
+
+    P1 --> H["交给节点<br/>远端解析域名"]
+    G --> H
+    R2 --> H
 ```
 
-**链 B — Bettbox**
+**关键点**：只有走到 ④ 和 ⑤ 才需要真实 IP。① ② ③ 全靠域名匹配，零解析、零污染风险。
 
-```
-AIsouler/MyClash 上游
-   ↓  sync-bettbox.yml（每天 04:00）
-scripts/build-bettbox.mjs  ←── bettbox/rules-extra.txt（手改）
-   ↓  生成
-bettbox/mihomoScript.js  →  Bettbox 桌面
+### Bettbox / Clash
+
+```mermaid
+flowchart TD
+    A([发起请求]) --> B["DNS 解析<br/><b>fake-ip 模式</b><br/>一律返回 198.18.x.x"]
+    B --> C{规则匹配}
+
+    C -->|"规则集<br/>AdBlock / AI / GitHub…"| R1[对应分组出口]
+    C -->|"geolocation-!cn"| R2[默认代理]
+    C -->|"cn_ip / private_ip"| R3[直连]
+    C -->|"未命中 ↓"| D[MATCH → 漏网之鱼]
+
+    R1 --> E["交给节点<br/>节点侧按域名分流解析"]
+    R2 --> E
+    D --> E
+
+    E --> F["nameserver-policy<br/>国内域名 → chinaDNS<br/>境外域名 → foreignDNS"]
 ```
 
-**链 C — App 去广告**
+**关键点**：本地 DNS **永远返回假 IP**，不存在污染问题。真正解析发生在节点侧，并按域名自动选对 DNS。
 
-```
-fmz200/wool_scripts 上游模块
-   ↓  sync-adblock.yml（每天 05:00）
-scripts/build-adblock.mjs
-   ↓  剔除全部银行/证券/支付类 App
-adblock/blockAds.srmodule  →  手机小火箭（模块）
-```
+### 一眼看懂差别
 
-三条链互不相干：改 A 不影响 B、C。
+| | 小火箭 | Bettbox |
+| --- | --- | --- |
+| 本地 DNS 用途 | 真解析，结果参与分流判断 | 只发假 IP，不参与连接 |
+| DNS 服务器数量 | **全局一个**，无法按域名切换 | 按域名策略自动选（`nameserver-policy`） |
+| 境外域名解析 | 国内 DoH → **可能污染** | 节点侧解析 → 干净 |
+| 防污染手段 | 靠规则顺序把域名挡在解析之前 | 架构层面免疫 |
+| 出问题的表现 | Load failed / 莫名走错出口 | 基本不会 |
+
+### 为什么小火箭要靠「规则顺序」兜底
+
+实测国内 DoH 对境外域名的解析结果：
+
+| 域名 | 阿里 DoH | 腾讯 DoH | 真实 IP |
+| --- | --- | --- | --- |
+| www.okx.com | `169.254.0.2` | `169.254.0.2` | 104.18.43.174 |
+| www.google.com | `69.171.235.22` | 142.251.156.119 | 142.251.157.119 |
+| coinbase.com | `31.13.96.192` | `199.59.148.6` | 104.18.35.15 |
+| www.binance.com | `208.101.60.87` | `199.16.158.104` | 13.35.190.32 |
+
+`169.254.x.x` 不可路由，`31.13.x.x` 是 Facebook 网段 —— 全是污染。
+
+小火箭无法避免解析，只能**让尽可能多的域名在解析之前就分流完毕**。这就是 `global.list`（66,969 条境外域名）必须放在 IP 规则前面的原因。
 
 ---
 
 ## 📱 小火箭
 
-### 导入
-
-配置 → 右上角 `+` → 填 URL → 下载。之后在配置列表点「更新」。
-
-> ⚠️ 从 URL 更新会**重置所有分组的 UI 选择**回默认值（`policy-select-name`）。
-
-### 规则匹配顺序（47 条）
+### 规则顺序（47 条）
 
 ```
-1    广告拦截        ads.list + ADLite
-1.5  显式优先        snssdk 直连、muse.ai → AI
-2    GitHub → AI     github.list → ai.list → OpenAI → Gemini
-3    流媒体          netflix → Disney+ → Max → YouTube → Spotify
-4    社交            telegram → meta → tiktok
-5    支付            PayPal → Amazon
-6    开发云          OneDrive → 微软 → 谷歌 → 苹果
-7    游戏            steam → SteamCN → Epic → Nintendo → Sony → Game
-8    国内直连        bilibili → douyin → cn-direct
-9    兜底            china → private → global(境外) → cn-ip → private-ip
-                     → GEOIP,CN → FINAL(漏网之鱼)
+1    广告拦截      ADLite + ads.list
+1.5  显式优先      snssdk 直连、muse.ai、okx
+2    GitHub → AI   github → ai → OpenAI → Gemini
+3    流媒体        Netflix → Disney+ → Max → YouTube → Spotify
+4    社交          Telegram → Facebook → TikTok
+5    支付          PayPal → Amazon
+6    开发云        OneDrive → 微软 → 谷歌 → 苹果
+7    游戏          Steam → SteamCN → Epic → Nintendo → Sony → Game
+8    国内直连      .cn → bilibili → douyin → cn-direct
+9    兜底          china → private → global(境外) → cn-ip → private-ip
+                   → GEOIP,CN → FINAL(漏网之鱼)
 ```
 
 **每个域名独立从上往下扫，命中第一条即停。**
 
+顺序不能随便改，几个必须遵守的约束：
+
+| 约束 | 原因 |
+| --- | --- |
+| 广告在最前 | 否则被后面的服务规则抢走 |
+| GitHub 在 AI 前 | Copilot 域名同时在 AI 规则集里 |
+| AI 在谷歌前 | `*.googleapis.com` 上的 Gemini 会被谷歌抢走 |
+| OneDrive 在微软前 | 微软规则集包含 OneDrive 域名 |
+| `.cn` 在国内段最前 | 企业站/地方站兜底 |
+| `global` 在 IP 规则前 | 避免触发 DNS 解析（见上一节） |
+
 ### 分组默认出口
 
-| 组 | 默认 | 组 | 默认 |
+| 分组 | 默认 | 分组 | 默认 |
 | --- | --- | --- | --- |
 | AI | 美国节点 | PayPal / Amazon | DIRECT |
-| 谷歌服务 | PROXY | 微软服务 / 苹果服务 | PROXY / DIRECT |
-| GitHub | PROXY | 游戏平台 | DIRECT |
-| YouTube | 香港节点 | 哔哩哔哩 | DIRECT |
-| 其余服务组 | PROXY | 漏网之鱼 | PROXY |
-| 地区组（6 个） | 手动，无自动切换 | 广告拦截 | REJECT |
+| YouTube | 香港节点 | 微软服务 | PROXY |
+| GitHub / 谷歌 / Telegram | PROXY | 苹果服务 | DIRECT |
+| 其余服务组 | PROXY | 游戏平台 / 哔哩哔哩 | DIRECT |
+| 地区组（6 个） | 手动选择，不自动切换 | 漏网之鱼 | PROXY |
+| | | 广告拦截 | REJECT |
 
-### 规则集清单（21 个）
+> 地区组是纯手动，选谁就是谁，不会自己跳。想改默认值就改 `config.conf` 里的 `policy-select-name`。
 
-| 文件 | 来源 | 内容 |
-| --- | --- | --- |
-| ai.list | geosite/category-ai-!cn | AI 服务 |
-| ads.list | geosite/category-ads | 广告 |
-| google.list | geosite/google | Google |
-| youtube.list | geosite/youtube | YouTube |
-| netflix.list | geosite/netflix | Netflix |
-| telegram.list | geosite/telegram | Telegram |
-| meta.list | geosite/meta | Facebook / Instagram / WhatsApp |
-| tiktok.list | geosite/tiktok | TikTok |
-| spotify.list | geosite/spotify | Spotify |
-| github.list | geosite/github | GitHub |
-| microsoft.list | geosite/microsoft | 微软 |
-| apple.list | geosite/apple | 苹果 |
-| paypal.list | geosite/paypal | PayPal |
-| steam.list | geosite/steam | Steam |
-| china.list | geosite/geolocation-cn | 中国大陆域名 |
-| private.list | geosite/private | 内网域名 |
-| global.list | geosite/geolocation-!cn | 境外已知域名，**必须在 IP 规则之前**（见下方 DNS 说明） |
-| douyin.list | geosite/douyin | 抖音 |
-| bilibili.list | blackmatrix7 BiliBili | B 站（过滤 USER-AGENT） |
-| cn-direct.list | blackmatrix7 ×9 | 网易/百度/微信/抖音/字节/小红书/知乎/微博/豆瓣 |
-| cn-ip.list | geoip/cn | 中国大陆 IP 段 |
-| private-ip.list | geoip/private | 内网 IP 段 |
+### 去广告
 
-### DNS 污染与规则顺序
+分两层，互相独立：
 
-小火箭没有 mihomo 的 `nameserver-policy`，无法按域名选择 DNS 服务器。所有非直连域名都走同一个 `dns-server`（国内 DoH）。
-
-实测国内 DoH 对境外域名的解析结果：
-
-| 域名 | 阿里 DoH | 腾讯 DoH | 真实 IP（Cloudflare） |
+| 层 | 手段 | 风险 | 拦什么 |
 | --- | --- | --- | --- |
-| www.okx.com | 169.254.0.2 | 169.254.0.2 | 104.18.43.174 |
-| www.google.com | 69.171.235.22 | 142.251.156.119 | 142.251.157.119 |
-| coinbase.com | 31.13.96.192 | 199.59.148.6 | 104.18.35.15 |
-| www.binance.com | 208.101.60.87 | 199.16.158.104 | 13.35.190.32 |
+| 1 | DNS 规则（ADLite 5 万条 + ads.list） | 零 | 独立广告域名、广告 SDK |
+| 2 | MITM 模块 | 低 | App 内信息流、开屏、弹窗 |
 
-`169.254.x.x` 是链路本地地址（不可路由），`31.13.x.x` / `199.16.x.x` 是 Facebook / Twitter 的 IP 段 —— 都是污染结果。
+**模块是裁剪过的**：上游 `fmz200/wool_scripts` 对 35 个银行域名开了 HTTPS 解密，这些 App 有证书固定，装了会直接无法联网。本仓库每天自动剔除全部金融类 App（银行/证券/基金/保险/钱包/支付），保留其余 686 款。
 
-**只要触发本地 DNS 解析，就可能误判分流或直接失败。**
+配置里还有第二重保险：
 
-所以规则顺序必须满足：**域名规则先于 IP 规则**。
-
-```
-china.list      → DIRECT     国内域名，不解析
-private.list    → DIRECT     内网域名，不解析
-global.list     → 漏网之鱼    境外域名，不解析（关键）
-cn-ip.list      → DIRECT     ↑ 到这里才开始需要解析
-private-ip.list → DIRECT
-GEOIP,CN        → DIRECT
-FINAL           → 漏网之鱼
+```ini
+[MITM]
+hostname = -*.ccb.com,-*.icbc.com.cn,-*.abchina.com,...   # 26 条金融域名负向排除
 ```
 
-境外域名在 `global.list` 就命中并确定走代理，域名原样交给节点远端解析，本地 DNS 完全绕开。
+即使以后误装了别的模块，这些域名也永远不会被解密。
 
-**代价**：少数「境外域名但国内有 CDN 节点」的站点会走代理而非直连，略慢。换来的是对 DNS 污染免疫。
+**出问题怎么回滚**：
+
+| 症状 | 处理 |
+| --- | --- |
+| 某个 App 异常 | `[MITM] hostname` 加 `,-*.该域名` |
+| 整体不对劲 | `[MITM] enable = false`，立刻恢复原状 |
 
 ---
 
 ## 💻 Bettbox
 
-在「覆写 / 脚本」设置里填上面的脚本地址。
+在「覆写 / 脚本」里填脚本地址即可，其余交给脚本。
 
-### 相对上游的补丁
+### 相对上游 MyClash 的改动
 
-| 补丁 | 内容 |
+| 改动 | 内容 |
 | --- | --- |
-| 规则顺序 | `AdBlock → GitHub → AI → FCM → YouTube → Google → ...` |
-| Copilot 归属 | GitHub 在 AI 之前，`copilot*` 自然归 GitHub，无需额外规则 |
-| AI 归属 | AI 在 Google 之前，`antigravity` / `gemini` 的 `*.googleapis.com` 不被 Google 抢 |
-| 兜底 IP | `cn_ip` / `private_ip` **不加** `no-resolve`（加了会让 IP 规则对域名请求直接跳过，国内 IP 兜底形同失效） |
+| 规则顺序 | `AdBlock → GitHub → AI → FCM → YouTube → Google → …` |
+| GitHub 提前 | Copilot 全系自然归 GitHub，不用逐条钉 |
+| AI 提前 | `antigravity` / `gemini` 的 `*.googleapis.com` 不被谷歌抢 |
+| `.cn` 兜底 | 补 `DOMAIN-SUFFIX,cn,直连`，覆盖企业站/地方站 |
 | 默认开关 | 基础三组 / FCM / Twitter / 地区自动组 / 倍率组关闭，IPv4 优先开启 |
 
 ### 加临时规则
 
-编辑 [`bettbox/rules-extra.txt`](bettbox/rules-extra.txt)，一行一条，会被注入 `rules` 最前面：
+编辑 [`bettbox/rules-extra.txt`](bettbox/rules-extra.txt)，一行一条，改动会被注入到规则最前面：
 
 ```
 DOMAIN-SUFFIX,example.com,美国
 PROCESS-NAME,Antigravity.exe,AI
 ```
 
-改完推上去 → Action 自动重建 → Bettbox 断开重连生效。
+改完推上去 → Action 几分钟内重建 → Bettbox 重连生效。
 
 ---
 
-## 🚫 App 去广告
+## 🔄 自动更新
 
-### 为什么需要 MITM
+三条独立流水线，每天各跑一次：
 
-DNS 层只能拦「独立广告域名」（`ads.xxx.com` 这种）。App 内信息流广告和业务接口**同域名**：
+```mermaid
+flowchart LR
+    U1[bett-rules<br/>geosite/geoip] -->|每天 03:00| W1[sync-shadowrocket]
+    W1 --> O1[shadowrocket/rules/*.list]
 
+    U2[AIsouler/MyClash] -->|每天 04:00| W2[sync-bettbox]
+    W2 --> O2[bettbox/mihomoScript.js]
+
+    U3[fmz200/wool_scripts] -->|每天 05:00| W3[sync-adblock]
+    W3 -->|剔除全部金融 App| O3[adblock/blockAds.srmodule]
 ```
-api.zhihu.com/api/v4/hot_recommendation   → 正常推荐 + 广告卡
-api.bilibili.com/x/feed/index             → 视频卡 + 广告卡
-```
 
-DNS 只能看到域名，无从分辨。要动这类广告必须解密 HTTPS。
-
-### 双保险设计
-
-| 层 | 措施 |
-| --- | --- |
-| 1 | 模块只用 `%APPEND%` 追加自己的 hostname，配置里不写正向列表 |
-| 2 | 配置 `[MITM]` 用负向排除（`-*.ccb.com` 等 26 条）兜底，任何模块都解密不了金融域名 |
-| 3 | 构建时从上游模块剔除 **44 个金融 App 段 + 35 个银行域名** |
-
-上游原版对 35 个银行域名开了 MITM（工行/建行/农行/中行/招行/浦发/民生/交行/邮储/中信/光大/兴业/北京/江苏/吉林/广发/平安…），这些 App 普遍有证书固定，装了原版会直接无法联网。本仓库的版本已全部剔除。
-
-### 安装
-
-1. 小火箭 → 模块 → 右上角 `+` → 填模块 URL
-2. 小火箭 → 配置 ⓘ → HTTPS 解密 → 生成 CA 证书 → 安装
-3. iOS 设置 → 已下载描述文件 → 安装
-4. iOS 设置 → 通用 → 关于本机 → 证书信任设置 → 打开小火箭开关
-
-### 模块选型
-
-对比过 yfamilys 的三份（startingad / adultra / adultraplus），最终仍用 fmz200/blockAds：
-
-| 模块 | MITM主域名 | URL Rewrite | Script | DNS规则 | 银行MITM |
-| --- | --- | --- | --- | --- | --- |
-| startingad | 409 | 572 | 170 | 0 | 7 |
-| adultra | 470 | 896 | 169 | 0 | 9 |
-| adultraplus | 822 | 2189 | 375 | 0 | 44 |
-| **blockAds** | 569 | 1415 | **738** | **3785** | **0** |
-
-adultraplus 域名覆盖更广（是 blockAds 的超集，多 261 个主域名），但：
-
-- 银行 MITM 高达 44 个，需重做剔除
-- **没有 DNS 层规则**，会丢掉 3785 条零风险拦截
-- Script 只有 blockAds 的一半，信息流广告处理更弱
-
-长尾 App 广告如仍在，按 App 名从 adultraplus 精确捞规则补入，比整包替换划算。
-
-### 出问题怎么办
-
-| 症状 | 处理 |
-| --- | --- |
-| 某个 App 异常 | `config.conf` 的 `[MITM] hostname` 加 `-该域名` |
-| 整体不对劲 | `[MITM] enable = false`，立即恢复原状 |
-| 银行 App 打不开 | 不应发生（已剔除 + 负向排除）；如发生立即关 `enable` 并反馈 |
-
-清缓存或重装 App 后广告拦截才会生效（模块缓存在 App 内）。
-
----
-
-## ⏱ 更新节奏
+改 A 不影响 B、C。
 
 | 变更 | 生效方式 |
 | --- | --- |
-| 上游规则变化 | 次日 03:00 自动重建 `rules/` |
-| 上游脚本变化 | 次日 04:00 自动重建 `mihomoScript.js` |
-| 上游广告模块变化 | 次日 05:00 自动重建 `blockAds.srmodule` |
-| 改 `rules-extra.txt` | Action 几分钟内重建（脚本侧自动生效） |
-| 改 `shadowrocket/config.conf` | **不自动**，手机要手动点更新 |
+| 上游规则变化 | 次日自动，小火箭需手动点「更新」 |
+| 上游脚本变化 | 次日自动，Bettbox 重连生效 |
+| 改 `rules-extra.txt` | 几分钟内，Bettbox 重连生效 |
+| 改 `config.conf` | **不自动**，手机要手动更新 |
 
 ---
 
-## 🔧 维护指南
+## 🔧 维护
 
-| 想改什么 | 改哪 | 之后 |
-| --- | --- | --- |
-| 小火箭分流规则/分组 | `shadowrocket/config.conf` | 手机重新导入 |
-| Bettbox 临时规则 | `bettbox/rules-extra.txt` | Bettbox 重连 |
-| 规则集分类增删 | `scripts/build-shadowrocket.mjs` 的 `GEOSITE` | Action 自动 |
-| 换规则上游 | 同上，改 `SRC` | Action 自动 |
-| 去广告模块剔除范围 | `scripts/build-adblock.mjs` 的 `FIN_SECTION` / `DOMAIN_PATTERNS` | Action 自动 |
-| Bettbox 补丁 | `scripts/build-bettbox.mjs` 的 `REPLACES` | Action 自动 |
+| 想改什么 | 改哪 |
+| --- | --- |
+| 分流规则 / 分组 | `shadowrocket/config.conf` |
+| Bettbox 临时规则 | `bettbox/rules-extra.txt` |
+| 规则集分类增删 | `scripts/build-shadowrocket.mjs` 的 `GEOSITE` |
+| Bettbox 补丁 | `scripts/build-bettbox.mjs` 的 `REPLACES` |
+| 去广告剔除范围 | `scripts/build-adblock.mjs` 的 `FIN_SECTION` |
 
-### 本地生成
+本地生成：
 
 ```bash
-node scripts/build-shadowrocket.mjs          # 全量
+node scripts/build-shadowrocket.mjs          # 全量规则集
 node scripts/build-shadowrocket.mjs ai china # 指定分类
 node scripts/build-bettbox.mjs               # Bettbox 脚本
-node scripts/build-bettbox.mjs --check       # 只校验锚点，不写文件
+node scripts/build-bettbox.mjs --check       # 只校验锚点
 node scripts/build-adblock.mjs               # 去广告模块
+node scripts/audit-adblock.mjs               # 审计模块引用的外部脚本
 ```
+
+---
+
+## ❓ 常见问题
+
+**Q：更新配置后分组选择全没了？**
+A：从 URL 更新会重置为 `policy-select-name` 的默认值，重新点一遍即可。
+
+**Q：某个网站打不开，换节点也没用？**
+A：先查 DNS。`curl -sS -H "accept: application/dns-json" "https://223.5.5.5/resolve?name=域名&type=A"`，如果返回 `169.254.x.x` 就是污染，在 `[Rule]` 的 1.5 段加一条 `DOMAIN-SUFFIX,域名,漏网之鱼`。
+
+**Q：广告还有怎么办？**
+A：先清 App 缓存或重装（模块效果缓存在 App 内）。仍不行就是没覆盖，反馈 App 名。
+
+**Q：装模块后银行 App 会不会出问题？**
+A：不会。银行域名从未进入解密流程，构建时也已剔除。真出问题就把 `[MITM] enable` 改回 `false`。
+
+**Q：能只去广告不代理吗？**
+A：不能。去广告模块依赖 MITM，而 MITM 需要代理接管流量。
 
 ---
 
@@ -315,18 +300,17 @@ node scripts/build-adblock.mjs               # 去广告模块
 
 | 源格式 | 输出 | 原因 |
 | --- | --- | --- |
-| geosite `+.example.com` | `example.com` + `.example.com` 两行 | 小火箭 `DOMAIN-SET` 不认 `+.` 前缀，照搬会静默失效 |
-| geosite 裸域名 | 原样保留 | 精确匹配 |
-| geoip `1.0.1.0/24` | `IP-CIDR,1.0.1.0/24` | **不加** `no-resolve`：加了该规则对域名请求直接跳过，IP 兜底失效 |
-| blackmatrix7 `USER-AGENT` / `IP-ASN` | 丢弃 | 小火箭规则集不支持，混入会导致整条规则集加载失败 |
+| geosite `+.example.com` | `example.com` + `.example.com` 两行 | DOMAIN-SET 不认 `+.` 前缀 |
+| geoip `1.0.1.0/24` | `IP-CIDR,1.0.1.0/24` | **不加** `no-resolve`：加了 IP 规则对域名请求直接跳过，兜底失效 |
+| 第三方规则集 `USER-AGENT` / `IP-ASN` | 丢弃 | 小火箭规则集不支持，混入会导致整条加载失败 |
 
 ---
 
-## 📜 数据来源与许可
+## 📜 数据来源
 
-规则内容版权归上游 [appshubcc/bett-rules](https://github.com/appshubcc/bett-rules)、
-[v2fly/domain-list-community](https://github.com/v2fly/domain-list-community)、
-[blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script) 所有。
+- 规则内容：[appshubcc/bett-rules](https://github.com/appshubcc/bett-rules)、[v2fly/domain-list-community](https://github.com/v2fly/domain-list-community)
+- 补充规则集：ios_rule_script
+- 去广告模块：[fmz200/wool_scripts](https://github.com/fmz200/wool_scripts)
+- 覆写脚本：[AIsouler/MyClash](https://github.com/AIsouler/MyClash)
 
-覆写脚本基于 [AIsouler/MyClash](https://github.com/AIsouler/MyClash)。
-本仓库仅做格式转换与顺序调整，不主张规则内容的所有权。
+本仓库只做格式转换、顺序调整和金融类剔除，不主张规则内容的所有权。
