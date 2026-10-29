@@ -210,6 +210,25 @@ DNS 只能看到域名，无从分辨。要动这类广告必须解密 HTTPS。
 3. iOS 设置 → 已下载描述文件 → 安装
 4. iOS 设置 → 通用 → 关于本机 → 证书信任设置 → 打开小火箭开关
 
+### 模块选型
+
+对比过 yfamilys 的三份（startingad / adultra / adultraplus），最终仍用 fmz200/blockAds：
+
+| 模块 | MITM主域名 | URL Rewrite | Script | DNS规则 | 银行MITM |
+| --- | --- | --- | --- | --- | --- |
+| startingad | 409 | 572 | 170 | 0 | 7 |
+| adultra | 470 | 896 | 169 | 0 | 9 |
+| adultraplus | 822 | 2189 | 375 | 0 | 44 |
+| **blockAds** | 569 | 1415 | **738** | **3785** | **0** |
+
+adultraplus 域名覆盖更广（是 blockAds 的超集，多 261 个主域名），但：
+
+- 银行 MITM 高达 44 个，需重做剔除
+- **没有 DNS 层规则**，会丢掉 3785 条零风险拦截
+- Script 只有 blockAds 的一半，信息流广告处理更弱
+
+长尾 App 广告如仍在，按 App 名从 adultraplus 精确捞规则补入，比整包替换划算。
+
 ### 出问题怎么办
 
 | 症状 | 处理 |
