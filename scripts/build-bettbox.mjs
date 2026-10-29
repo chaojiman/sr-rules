@@ -69,6 +69,20 @@ const prefixRules = [
 ${extraBlock}`,
   },
 
+  // ── 必需：.cn 后缀兜底（geolocation-cn 是人工列表，覆盖不到企业/地方站点）──
+  {
+    name: '.cn 后缀直连',
+    required: true,
+    from: `  'DOMAIN-SUFFIX,ctaiot.com,直连',
+];`,
+    to: `  'DOMAIN-SUFFIX,ctaiot.com,直连',
+
+  // geolocation-cn 是人工维护的常用站点列表，覆盖不到企业/地方 .cn 站点
+  // 用后缀兜底，零 DNS 成本
+  'DOMAIN-SUFFIX,cn,直连',
+];`,
+  },
+
   // ── 必需：兜底 IP 规则加 no-resolve，避免每个域名多一次无效 DNS 解析 ──
   {
     name: '兜底 IP 规则 no-resolve',

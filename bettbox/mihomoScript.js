@@ -85,6 +85,10 @@ const prefixRules = [
   'DOMAIN,fsend.cn,直连',
   'DOMAIN,international-gfe.download.nvidia.com,直连',
   'DOMAIN-SUFFIX,ctaiot.com,直连',
+
+  // geolocation-cn 是人工维护的常用站点列表，覆盖不到企业/地方 .cn 站点
+  // 用后缀兜底，零 DNS 成本
+  'DOMAIN-SUFFIX,cn,直连',
 ];
 
 // 此处添加自定义节点，填入下方[]内（可选，留空则不生成“自建节点”策略组）
