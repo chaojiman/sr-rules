@@ -60,6 +60,31 @@
     node build-rules.mjs          # 全量
     node build-rules.mjs ai china # 只生成指定分类
 
+## Bettbox 覆写脚本
+
+[bettbox/mihomoScript.js](bettbox/mihomoScript.js) 由 [build-bettbox-script.mjs](build-bettbox-script.mjs)
+每天自动从 [AIsouler/MyClash](https://github.com/AIsouler/MyClash) 拉取上游并打补丁生成：
+
+| 补丁 | 内容 |
+| --- | --- |
+| 规则顺序 | `AdBlock → AI → FCM → YouTube → GitHub → Google → ...`，AI 提到第 2 位 |
+| Copilot 归属 | 7 条 `copilot*` 显式钉回 GitHub 组（否则被 AI 抢走） |
+| 默认开关 | 对齐当前实测：地区自动组/倍率组/基础组/FCM/Twitter 关闭，IPv4 优先开启 |
+
+在 Bettbox 中填：
+
+```
+https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.js
+```
+
+大陆拉不动时用 jsDelivr：
+
+```
+https://cdn.jsdelivr.net/gh/chaojiman/sr-rules@main/bettbox/mihomoScript.js
+```
+
+临时规则写在生成文件的 `prefixRules` 顶部「临时规则区」，上游更新不会覆盖该区块的注入逻辑。
+
 ## 数据来源与许可
 
 规则内容版权归上游 [appshubcc/bett-rules](https://github.com/appshubcc/bett-rules) 及
