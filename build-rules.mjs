@@ -45,6 +45,23 @@ const GEOIP = {
   'private-ip': 'private',
 };
 
+// 合并类：把多个 blackmatrix7 规则集合成 1 个（减少引用条数）
+const BM7 = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule';
+const MERGE = {
+  'cn-direct': [
+    'Shadowrocket/BiliBili/BiliBili.list',
+    'Shadowrocket/NetEaseMusic/NetEaseMusic.list',
+    'Shadowrocket/Baidu/Baidu.list',
+    'Surge/WeChat/WeChat.list',
+    'Shadowrocket/DouYin/DouYin.list',
+    'Shadowrocket/ByteDance/ByteDance.list',
+    'Shadowrocket/XiaoHongShu/XiaoHongShu.list',
+    'Shadowrocket/Zhihu/Zhihu.list',
+    'Shadowrocket/Sina/Sina.list',
+    'Shadowrocket/DouBan/DouBan.list',
+  ],
+};
+
 fs.mkdirSync(OUT, { recursive: true });
 
 async function get(url) {
@@ -93,6 +110,36 @@ for (const [out, src] of Object.entries(GEOIP)) {
   total += lines.length;
   files++;
   console.log(`${out.padEnd(10)} ← geoip/${src.padEnd(24)} ${String(lines.length).padStart(6)} 行`);
+}
+
+for (const [out, paths] of Object.entries(MERGE)) {
+  if (!want(out)) continue;
+  const set = new Set();
+  const dropped = {};
+  for (const p of paths) {
+    const txt = await get(`${BM7}/${p}`);
+    for (const raw of txt.split('\n')) {
+      let l = raw.trim();
+      if (!l || l.startsWith('#')) continue;
+      const type = (l.split(',')[0] || '').toUpperCase();
+      // 只保留小火箭 RULE-SET 确定支持的类型
+      if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'IP-CIDR', 'IP-CIDR6'].includes(type)) {
+        dropped[type] = (dropped[type] || 0) + 1;
+        continue;
+      }
+      // IP 段补 no-resolve，避免引用时漏写导致全量 DNS 解析
+      if (/^IP-CIDR6?,/i.test(l) && !/no-resolve/i.test(l)) l += ',no-resolve';
+      set.add(l);
+    }
+  }
+  const lines = [...set];
+  fs.writeFileSync(path.join(OUT, out + '.list'), lines.join('\n') + '\n');
+  total += lines.length;
+  files++;
+  const dropNote = Object.keys(dropped).length
+    ? `  (丢弃 ${Object.entries(dropped).map(([k, v]) => `${k}×${v}`).join(' ')}）`
+    : '';
+  console.log(`${out.padEnd(10)} ← 合并 ${paths.length} 个源          ${String(lines.length).padStart(6)} 行${dropNote}`);
 }
 
 console.log(`\n${files} 个文件 / 合计 ${total} 行 → ${OUT}`);
