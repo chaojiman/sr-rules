@@ -32,7 +32,7 @@ https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds.srmod
 sr-rules/
 ├── shadowrocket/               小火箭
 │   ├── config.conf             完整配置（分组 + 规则）
-│   └── rules/*.list            21 个规则集
+│   └── rules/*.list            22 个规则集
 ├── bettbox/                    Bettbox
 │   ├── mihomoScript.js         生成的覆写脚本
 │   └── rules-extra.txt         ★ 手改这里加临时规则
@@ -97,7 +97,7 @@ adblock/blockAds.srmodule  →  手机小火箭（模块）
 
 > ⚠️ 从 URL 更新会**重置所有分组的 UI 选择**回默认值（`policy-select-name`）。
 
-### 规则匹配顺序（46 条）
+### 规则匹配顺序（47 条）
 
 ```
 1    广告拦截        ads.list + ADLite
@@ -109,7 +109,7 @@ adblock/blockAds.srmodule  →  手机小火箭（模块）
 6    开发云          OneDrive → 微软 → 谷歌 → 苹果
 7    游戏            steam → SteamCN → Epic → Nintendo → Sony → Game
 8    国内直连        bilibili → douyin → cn-direct
-9    兜底            Global(漏网之鱼) → china → private → cn-ip → private-ip
+9    兜底            china → private → global(境外) → cn-ip → private-ip
                      → GEOIP,CN → FINAL(漏网之鱼)
 ```
 
@@ -146,10 +146,45 @@ adblock/blockAds.srmodule  →  手机小火箭（模块）
 | steam.list | geosite/steam | Steam |
 | china.list | geosite/geolocation-cn | 中国大陆域名 |
 | private.list | geosite/private | 内网域名 |
+| global.list | geosite/geolocation-!cn | 境外已知域名，**必须在 IP 规则之前**（见下方 DNS 说明） |
 | douyin.list | geosite/douyin | 抖音 |
 | bilibili.list | blackmatrix7 BiliBili | B 站（过滤 USER-AGENT） |
 | cn-direct.list | blackmatrix7 ×9 | 网易/百度/微信/抖音/字节/小红书/知乎/微博/豆瓣 |
 | cn-ip.list | geoip/cn | 中国大陆 IP 段 |
+| private-ip.list | geoip/private | 内网 IP 段 |
+
+### DNS 污染与规则顺序
+
+小火箭没有 mihomo 的 `nameserver-policy`，无法按域名选择 DNS 服务器。所有非直连域名都走同一个 `dns-server`（国内 DoH）。
+
+实测国内 DoH 对境外域名的解析结果：
+
+| 域名 | 阿里 DoH | 腾讯 DoH | 真实 IP（Cloudflare） |
+| --- | --- | --- | --- |
+| www.okx.com | 169.254.0.2 | 169.254.0.2 | 104.18.43.174 |
+| www.google.com | 69.171.235.22 | 142.251.156.119 | 142.251.157.119 |
+| coinbase.com | 31.13.96.192 | 199.59.148.6 | 104.18.35.15 |
+| www.binance.com | 208.101.60.87 | 199.16.158.104 | 13.35.190.32 |
+
+`169.254.x.x` 是链路本地地址（不可路由），`31.13.x.x` / `199.16.x.x` 是 Facebook / Twitter 的 IP 段 —— 都是污染结果。
+
+**只要触发本地 DNS 解析，就可能误判分流或直接失败。**
+
+所以规则顺序必须满足：**域名规则先于 IP 规则**。
+
+```
+china.list      → DIRECT     国内域名，不解析
+private.list    → DIRECT     内网域名，不解析
+global.list     → 漏网之鱼    境外域名，不解析（关键）
+cn-ip.list      → DIRECT     ↑ 到这里才开始需要解析
+private-ip.list → DIRECT
+GEOIP,CN        → DIRECT
+FINAL           → 漏网之鱼
+```
+
+境外域名在 `global.list` 就命中并确定走代理，域名原样交给节点远端解析，本地 DNS 完全绕开。
+
+**代价**：少数「境外域名但国内有 CDN 节点」的站点会走代理而非直连，略慢。换来的是对 DNS 污染免疫。
 
 ---
 
