@@ -83,16 +83,8 @@ ${extraBlock}`,
 ];`,
   },
 
-  // ── 必需：兜底 IP 规则不加 no-resolve ──
-  // no-resolve 会让 IP 规则对域名请求直接跳过，国内 / 内网 IP 兜底形同失效
-  {
-    name: '兜底 IP 规则不加 no-resolve',
-    required: true,
-    from: `    'RULE-SET,cn_ip,直连,no-resolve',
-    'RULE-SET,private_ip,直连,no-resolve',`,
-    to: `    'RULE-SET,cn_ip,直连',
-    'RULE-SET,private_ip,直连',`,
-  },
+  // 注：上游 cn_ip / private_ip 本来就不带 no-resolve，无需补丁。
+  //     加 no-resolve 会让 IP 规则对域名请求直接跳过，国内 IP 兜底形同失效。
 
   // ── 默认值对齐当前 Bettbox UI 实测状态（非必需，上游删项时不中断）──
   { name: '手动选择=关', required: false, from: /^(\s*)手动选择:\s*true,/m, to: '$1手动选择: false,' },
