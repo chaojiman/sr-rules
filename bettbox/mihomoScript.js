@@ -64,8 +64,9 @@ const ruleOptionsEnable = {
 // 定义前置规则
 // ⚠️ 本文件由 build-bettbox-script.mjs 自动生成，不要手改
 // 上游: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
+// 额外规则: bettbox/rules-extra.txt
 const prefixRules = [
-  // ===== 临时规则区（改这里，用完删）=====
+  // ===== 额外规则（来自 bettbox/rules-extra.txt，勿直接改本文件）=====
   'DOMAIN-SUFFIX,morphllm.com,美国',
 
   // 规则集下载域名，避免出现鸡蛋问题

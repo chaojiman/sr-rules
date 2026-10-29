@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - 'build-bettbox-script.mjs'
+      - 'bettbox/rules-extra.txt'
       - '.github/workflows/sync-bettbox-script.yml'
 
 permissions:

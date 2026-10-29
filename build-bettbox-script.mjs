@@ -16,6 +16,23 @@ const SRC = 'https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/miho
 const OUT = path.resolve('bettbox/mihomoScript.js');
 const CHECK_ONLY = process.argv.includes('--check');
 
+// ── 额外规则：从 bettbox/rules-extra.txt 读取，注入 prefixRules 最前面 ──
+const EXTRA_FILE = path.resolve('bettbox/rules-extra.txt');
+const extraRules = fs.existsSync(EXTRA_FILE)
+  ? fs
+      .readFileSync(EXTRA_FILE, 'utf8')
+      .replace(/\r/g, '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'))
+  : [];
+
+const extraBlock = extraRules.length
+  ? `  // ===== 额外规则（来自 bettbox/rules-extra.txt，勿直接改本文件）=====\n` +
+    extraRules.map((l) => `  '${l.replace(/'/g, "\\'")}',`).join('\n') +
+    '\n'
+  : '';
+
 // ── 补丁定义 ──────────────────────────────────────────────
 // required: 锚点丢失时是否中断构建
 
@@ -40,17 +57,16 @@ const REPLACES = [
   ];`,
   },
 
-  // ── 必需：临时规则区 ──
+  // ── 必需：额外规则注入 ──
   {
-    name: 'prefixRules 临时规则',
+    name: 'prefixRules 额外规则',
     required: true,
     from: `const prefixRules = [`,
     to: `// ⚠️ 本文件由 build-bettbox-script.mjs 自动生成，不要手改
 // 上游: ${SRC}
+// 额外规则: bettbox/rules-extra.txt
 const prefixRules = [
-  // ===== 临时规则区（改这里，用完删）=====
-  'DOMAIN-SUFFIX,morphllm.com,美国',
-`,
+${extraBlock}`,
   },
 
   // ── 默认值对齐当前 Bettbox UI 实测状态（非必需，上游删项时不中断）──

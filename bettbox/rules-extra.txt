@@ -1,0 +1,16 @@
+# Bettbox 额外规则
+#
+# 每行一条 mihomo 规则，会被插到 rules 的【最前面】（优先级最高）。
+# 改完这里，GitHub Action 会自动重建 bettbox/mihomoScript.js。
+# 用完的临时规则记得删掉，否则会一直生效。
+#
+# 格式示例：
+#   DOMAIN-SUFFIX,example.com,美国
+#   DOMAIN,sub.example.com,GitHub
+#   DOMAIN-KEYWORD,foobar,默认代理
+#
+# 组名必须是：默认代理 / 直连 / 香港 / 日本 / 美国 / 新加坡 / 台湾 /
+#             GitHub / AI / Google / YouTube / Netflix ...
+
+# 临时：morphllm 走美国
+DOMAIN-SUFFIX,morphllm.com,美国

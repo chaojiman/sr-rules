@@ -67,9 +67,11 @@
 
 | 补丁 | 内容 |
 | --- | --- |
-| 规则顺序 | `AdBlock → AI → FCM → YouTube → GitHub → Google → ...`，AI 提到第 2 位 |
-| Copilot 归属 | 7 条 `copilot*` 显式钉回 GitHub 组（否则被 AI 抢走） |
-| 默认开关 | 对齐当前实测：地区自动组/倍率组/基础组/FCM/Twitter 关闭，IPv4 优先开启 |
+| 规则顺序 | `AdBlock → GitHub → AI → FCM → YouTube → Google → ...` |
+| Copilot 归属 | GitHub 排在 AI 之前，`copilot*` 自然归 GitHub，无需额外规则 |
+| AI 归属 | AI 排在 Google 之前，`antigravity` / `gemini` 的 `*.googleapis.com` 不被 Google 抢 |
+| 默认开关 | 对齐实测：基础三组 / FCM / Twitter / 地区自动组 / 倍率组关闭，IPv4 优先开启 |
+| 额外规则 | 读 [bettbox/rules-extra.txt](bettbox/rules-extra.txt)，注入 `rules` 最前面 |
 
 在 Bettbox 中填：
 
@@ -83,7 +85,8 @@ https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.j
 https://cdn.jsdelivr.net/gh/chaojiman/sr-rules@main/bettbox/mihomoScript.js
 ```
 
-临时规则写在生成文件的 `prefixRules` 顶部「临时规则区」，上游更新不会覆盖该区块的注入逻辑。
+临时规则写在 [bettbox/rules-extra.txt](bettbox/rules-extra.txt)，一行一条，会被注入 `rules` 最前面。
+改完推上去，Action 自动重建 `bettbox/mihomoScript.js`。
 
 ## 数据来源与许可
 
