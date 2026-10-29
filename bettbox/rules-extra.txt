@@ -14,3 +14,7 @@
 
 # 临时：morphllm 走美国
 DOMAIN-SUFFIX,morphllm.com,美国
+
+# Antigravity 全进程走 AI：登录 / 推理 / 更新 / 扩展统一出口，避免登录地与调用地不一致触发风控
+# 需要 tun 开启 + find-process-mode: strict（脚本已满足）
+PROCESS-NAME,Antigravity.exe,AI

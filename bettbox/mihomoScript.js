@@ -68,6 +68,7 @@ const ruleOptionsEnable = {
 const prefixRules = [
   // ===== 额外规则（来自 bettbox/rules-extra.txt，勿直接改本文件）=====
   'DOMAIN-SUFFIX,morphllm.com,美国',
+  'PROCESS-NAME,Antigravity.exe,AI',
 
   // 规则集下载域名，避免出现鸡蛋问题
   'DOMAIN,cdn.jsdmirror.com,直连',
