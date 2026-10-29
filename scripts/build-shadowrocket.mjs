@@ -34,7 +34,10 @@ const GEOSITE = {
   paypal: 'paypal',
   steam: 'steam',
   china: 'geolocation-cn',
-  // global (geolocation-!cn) 6.7 万行，收益等同 FINAL 兜底，不生成
+  // 境外已知域名。作用不是「兜底」（FINAL 也能兜），而是让境外域名在
+  // 命中 GEOIP 之前就确定走向，避免触发本地 DNS 解析 —— 国内 DoH 对
+  // 境外域名普遍返回污染 IP（如 okx → 169.254.0.2），一旦解析就会误判。
+  global: 'geolocation-!cn',
   private: 'private',
   douyin: 'douyin',
 };
