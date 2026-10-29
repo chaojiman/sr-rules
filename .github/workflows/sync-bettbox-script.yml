@@ -1,0 +1,44 @@
+name: sync-bettbox-script
+
+on:
+  schedule:
+    # UTC 20:00 = 北京时间 04:00
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'build-bettbox-script.mjs'
+      - '.github/workflows/sync-bettbox-script.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-bettbox-script
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 拉取上游并打补丁
+        run: node build-bettbox-script.mjs
+
+      - name: 提交变更
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bettbox/mihomoScript.js
+          if git diff --cached --quiet; then
+            echo "上游无变化，跳过提交"
+            exit 0
+          fi
+          git commit -m "chore: sync bettbox script $(date -u +%Y-%m-%d)"
+          git push
