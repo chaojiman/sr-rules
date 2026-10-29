@@ -18,13 +18,11 @@ const OUT = path.resolve('rules');
 // 输出文件名 → bett-rules geosite 分类名
 const GEOSITE = {
   ai: 'category-ai-!cn',
-  crypto: 'category-cryptocurrency',
   ads: 'category-ads',
   google: 'google',
   youtube: 'youtube',
   netflix: 'netflix',
   telegram: 'telegram',
-  twitter: 'twitter',
   meta: 'meta',
   tiktok: 'tiktok',
   spotify: 'spotify',
