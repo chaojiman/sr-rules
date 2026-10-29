@@ -3,9 +3,11 @@
  *
  * geosite:  +.example.com  →  example.com / .example.com （两行，精确 + 后缀）
  *           example.com    →  example.com
- * geoip:    1.0.1.0/24     →  IP-CIDR,1.0.1.0/24,no-resolve
+ * geoip:    1.0.1.0/24     →  IP-CIDR,1.0.1.0/24
  *           IPv6 段        →  IP-CIDR6,...,no-resolve
  *
+ * 注意：IP 规则一律不加 no-resolve。
+ *       加了 no-resolve 会让该规则对「域名请求」直接跳过，IP 兜底形同失效。
  * 输出到 rules/，供小火箭 DOMAIN-SET / RULE-SET 直接引用
  * 用法: node build-rules.mjs
  */
@@ -102,8 +104,8 @@ for (const [out, src] of Object.entries(GEOIP)) {
   for (const raw of txt.split('\n')) {
     const d = raw.trim();
     if (!d || d.startsWith('#')) continue;
-    if (/^\d+\.\d+\.\d+\.\d+\/\d+$/.test(d)) lines.push(`IP-CIDR,${d},no-resolve`);
-    else if (d.includes(':') && d.includes('/')) lines.push(`IP-CIDR6,${d},no-resolve`);
+    if (/^\d+\.\d+\.\d+\.\d+\/\d+$/.test(d)) lines.push(`IP-CIDR,${d}`);
+    else if (d.includes(':') && d.includes('/')) lines.push(`IP-CIDR6,${d}`);
   }
   fs.writeFileSync(path.join(OUT, out + '.list'), lines.join('\n') + '\n');
   total += lines.length;
@@ -126,8 +128,8 @@ for (const [out, paths] of Object.entries(MERGE)) {
         dropped[type] = (dropped[type] || 0) + 1;
         continue;
       }
-      // IP 段补 no-resolve，避免引用时漏写导致全量 DNS 解析
-      if (/^IP-CIDR6?,/i.test(l) && !/no-resolve/i.test(l)) l += ',no-resolve';
+      // 不加 no-resolve：加了会让 IP 规则对所有域名请求失效（源里自带的也剥掉）
+      l = l.replace(/,no-resolve$/i, '');
       set.add(l);
     }
   }
