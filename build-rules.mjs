@@ -48,8 +48,9 @@ const GEOIP = {
 // 合并类：把多个 blackmatrix7 规则集合成 1 个（减少引用条数）
 const BM7 = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule';
 const MERGE = {
+  // B 站单独一条，指向独立的「哔哩哔哩」组（默认直连，可切代理）
+  bilibili: ['Shadowrocket/BiliBili/BiliBili.list'],
   'cn-direct': [
-    'Shadowrocket/BiliBili/BiliBili.list',
     'Shadowrocket/NetEaseMusic/NetEaseMusic.list',
     'Shadowrocket/Baidu/Baidu.list',
     'Surge/WeChat/WeChat.list',
