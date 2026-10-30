@@ -61,6 +61,14 @@ const DOMAIN_PATTERNS = [
   /(^|\.)payapp\.weixin\.qq\.com$/,   // 微信支付
   /(^|\.)wx\.tenpay\.com$/,
   /(^|\.)paas\.cmbchina\.com$/,
+
+  // ── 性能豁免：主 API 被 http-response 全量缓冲，会让 App 启动明显卡顿 ──
+  // 京东：Script 的 pattern 含 functionId=start / welcomeHome（启动接口），
+  //       requires-body=true 要求收完整个响应体才交给 App。
+  //       京东的广告域名已由 DNS 层 13 条规则覆盖（jzt/img-x/dsp-x/kepler…），
+  //       不再解密主 API。
+  /(^|\.)api\.m\.jd\.com$/,
+  /(^|\.)dns\.jd\.com$/,
 ];
 
 const isFinHost = (h) => DOMAIN_PATTERNS.some((re) => re.test(h));
