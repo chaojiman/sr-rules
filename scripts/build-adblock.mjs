@@ -63,6 +63,13 @@ const DOMAIN_PATTERNS = [
   /(^|\.)paas\.cmbchina\.com$/,
   // 已在 DNS 层 REJECT，无需解密
   /(^|\.)dns\.jd\.com$/,
+
+  // ── 速度优先：京东主 API 不解密 ──
+  // api.m.jd.com 承载搜索、商品详情、订单、首页 tab 等全部核心请求。
+  // 一旦解密并被 http-response 脚本处理（requires-body 要缓冲完整响应体），
+  // 浏览和搜索会明显变卡。开屏广告也随之放弃。
+  // 京东独立广告域名（jzt/img-x/dsp-x/kepler/mapi.m…）仍由 DNS 层 13 条规则拦截。
+  /(^|\.)api\.m\.jd\.com$/,
 ];
 
 // ── 规则改写（在剔除之后应用）──────────────────────────
