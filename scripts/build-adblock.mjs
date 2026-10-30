@@ -61,14 +61,28 @@ const DOMAIN_PATTERNS = [
   /(^|\.)payapp\.weixin\.qq\.com$/,   // 微信支付
   /(^|\.)wx\.tenpay\.com$/,
   /(^|\.)paas\.cmbchina\.com$/,
-
-  // ── 性能豁免：主 API 被 http-response 全量缓冲，会让 App 启动明显卡顿 ──
-  // 京东：Script 的 pattern 含 functionId=start / welcomeHome（启动接口），
-  //       requires-body=true 要求收完整个响应体才交给 App。
-  //       京东的广告域名已由 DNS 层 13 条规则覆盖（jzt/img-x/dsp-x/kepler…），
-  //       不再解密主 API。
-  /(^|\.)api\.m\.jd\.com$/,
+  // 已在 DNS 层 REJECT，无需解密
   /(^|\.)dns\.jd\.com$/,
+];
+
+// ── 规则改写（在剔除之后应用）──────────────────────────
+const REPLACES = [
+  {
+    // 京东主 App 的响应脚本原本覆盖 7 个接口，其中 getTabHomeInfo / myOrderInfo
+    // 等响应体很大，requires-body 会缓冲完整响应，导致启动、搜索明显卡顿。
+    // 只保留启动与欢迎页两个接口 —— 开屏广告就在这两个里面。
+    name: '京东脚本收窄到启动接口',
+    required: true,
+    from: /pattern=\^https:\\\/\\\/api\\\.m\\\.jd\\\.com\\\/client\\\.action\\\?functionId=\([^)]*\)/,
+    to: 'pattern=^https:\\/\\/api\\.m\\.jd\\.com\\/client\\.action\\?functionId=(start|welcomeHome)',
+  },
+  {
+    // 脚本超时从 60s 降到 8s，避免脚本异常时挂死请求
+    name: '京东脚本超时收紧',
+    required: false,
+    from: /(script-path=https:\/\/raw\.githubusercontent\.com\/fmz200\/wool_scripts\/main\/Scripts\/jingdong\/jingdong\.js, requires-body=true, timeout=)\d+/,
+    to: '$18',
+  },
 ];
 
 const isFinHost = (h) => DOMAIN_PATTERNS.some((re) => re.test(h));
@@ -124,9 +138,22 @@ for (const line of lines) {
   out.push(line);
 }
 
-const result = out
-  .join('\n')
-  // 头部改写：指向自己的仓库，避免「检查更新」跳回上游把金融段装回来
+let result = out.join('\n');
+
+// 先应用规则改写
+const repReport = [];
+for (const p of REPLACES) {
+  const hit = typeof p.from === 'string' ? result.includes(p.from) : p.from.test(result);
+  if (!hit) {
+    repReport.push(`${p.required ? '❌' : '⚠️ '} ${p.name} —— 锚点未命中`);
+    continue;
+  }
+  result = result.replace(p.from, p.to);
+  repReport.push(`✅ ${p.name}`);
+}
+
+// 头部改写：指向自己的仓库，避免「检查更新」跳回上游把金融段装回来
+result = result
   .replace(/^#!name=.*/m, '#!name=广告拦截(已剔金融版)')
   .replace(/^#!desc=.*/m, '#!desc=基于 fmz200/blockAds 裁剪，已移除全部银行/证券/支付类 App（上游对这些域名开 MITM，会致银行 App 无法联网）')
   .replace(/^#!homepage=.*/m, '#!homepage=https://github.com/chaojiman/sr-rules')
@@ -135,6 +162,7 @@ const result = out
 console.log(`上游 ${(src.length / 1024).toFixed(0)} KB → 输出 ${(result.length / 1024).toFixed(0)} KB`);
 console.log(`剔除段落 ${removedSections.length} 个：${[...new Set(removedSections)].join('、') || '（无）'}`);
 console.log(`剔除 MITM 域名 ${removedHosts.size} 个：${[...removedHosts].join(', ') || '（无）'}`);
+console.log(repReport.join('\n'));
 
 if (removedSections.length === 0 && removedHosts.size === 0) {
   console.error('⚠️ 没有剔除任何内容 —— 上游结构可能已变，请人工检查');
