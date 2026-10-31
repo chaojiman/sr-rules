@@ -12,6 +12,15 @@
 # 组名必须是：默认代理 / 直连 / 香港 / 日本 / 美国 / 新加坡 / 台湾 /
 #             GitHub / AI / Google / YouTube / Netflix ...
 
+# ===== Tailscale 内网直连 =====
+# 100.64.0.0/10      Tailscale IPv4 地址段（与运营商 CGNAT 共用，公网服务极少使用）
+# fd7a:115c:a1e0::/48 Tailscale IPv6 ULA 段
+# ts.net             MagicDNS 后缀
+# no-resolve：纯 IP 规则不触发本地 DNS 解析，避免每个连接多一次查询
+IP-CIDR,100.64.0.0/10,直连,no-resolve
+IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve
+DOMAIN-SUFFIX,ts.net,直连
+
 # 临时：morphllm 走美国
 DOMAIN-SUFFIX,morphllm.com,美国
 
