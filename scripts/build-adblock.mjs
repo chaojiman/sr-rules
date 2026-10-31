@@ -70,6 +70,12 @@ const DOMAIN_PATTERNS = [
   // 浏览和搜索会明显变卡。开屏广告也随之放弃。
   // 京东独立广告域名（jzt/img-x/dsp-x/kepler/mapi.m…）仍由 DNS 层 13 条规则拦截。
   /(^|\.)api\.m\.jd\.com$/,
+
+  // ── 可用性豁免：主 API 被 Map Local 返回 {} 会导致 App 无法使用 ──
+  // 山姆：模块对该域名有 1 条 reject + 6 条 Map Local，其中包含
+  //       getAppVersionUpdateInfo（版本检查）和 beUpdate（配置更新），
+  //       返回空对象会让 App 判定启动异常、无法进入。
+  /(^|\.)api-sams\.walmartmobile\.cn$/,
 ];
 
 // ── 规则改写（在剔除之后应用）──────────────────────────
