@@ -67,6 +67,9 @@ const ruleOptionsEnable = {
 // 额外规则: bettbox/rules-extra.txt
 const prefixRules = [
   // ===== 额外规则（来自 bettbox/rules-extra.txt，勿直接改本文件）=====
+  'IP-CIDR,100.64.0.0/10,直连,no-resolve',
+  'IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve',
+  'DOMAIN-SUFFIX,ts.net,直连',
   'DOMAIN-SUFFIX,morphllm.com,美国',
   'PROCESS-NAME,Antigravity.exe,AI',
 
