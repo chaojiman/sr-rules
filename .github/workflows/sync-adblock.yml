@@ -31,6 +31,10 @@ jobs:
       - name: 拉取上游模块并剔除金融段
         run: node scripts/build-adblock.mjs
 
+      - name: 风险扫描（不阻断构建）
+        run: node scripts/check-adblock-risk.mjs
+        continue-on-error: true
+
       - name: 提交变更
         run: |
           git config user.name "github-actions[bot]"

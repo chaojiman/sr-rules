@@ -198,6 +198,35 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.abchina.com,...   # 26 条金融域名�
 | 某个 App 异常 | `[MITM] hostname` 加 `,-*.该域名` |
 | 整体不对劲 | `[MITM] enable = false`，立刻恢复原状 |
 
+### 主 API 风险与检测
+
+模块最容易出问题的地方：**对 App 的主 API 做 MITM**，并让版本检查、配置下发这类接口返回 `{}`，App 会直接不可用或明显卡顿。
+
+已经踩过两次：
+
+| App | 域名 | 症状 | 处理 |
+| --- | --- | --- | --- |
+| 京东 | `api.m.jd.com` | 浏览/搜索卡顿 | 移出 MITM |
+| 山姆 | `api-sams.walmartmobile.cn` | 完全无法访问 | 移出 MITM |
+
+每次构建后自动跑一次扫描：
+
+```bash
+node scripts/check-adblock-risk.mjs
+```
+
+输出分级清单：
+
+```
+🔴 高危   主 API + 版本/登录/启动接口   → 最可能导致 App 不可用
+🟡 中危   主 API + config/init/home 类
+⚪ 其余   主 API + 纯广告位
+```
+
+规则还在但域名已移出 MITM 的，标记为「已豁免」，不参与统计。
+
+**新增豁免**：在 `scripts/build-adblock.mjs` 的 `DOMAIN_PATTERNS` 里加一行正则即可。
+
 ---
 
 ## 💻 Bettbox
@@ -272,6 +301,7 @@ node scripts/build-shadowrocket.mjs ai china # 指定分类
 node scripts/build-bettbox.mjs               # Bettbox 脚本
 node scripts/build-bettbox.mjs --check       # 只校验锚点
 node scripts/build-adblock.mjs               # 去广告模块
+node scripts/check-adblock-risk.mjs          # 扫描模块里的高危规则
 node scripts/audit-adblock.mjs               # 审计模块引用的外部脚本
 ```
 
