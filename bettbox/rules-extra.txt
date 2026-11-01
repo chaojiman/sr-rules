@@ -17,13 +17,25 @@
 # fd7a:115c:a1e0::/48 Tailscale IPv6 ULA 段
 # ts.net             MagicDNS 后缀
 # no-resolve：纯 IP 规则不触发本地 DNS 解析，避免每个连接多一次查询
+# ⚠️ TUN 模式下这三条只是兜底：真正让 tailnet 不进 TUN 的是 Bettbox 界面
+#    「绕过私有网络」地址列表里的 100.64.0.0/10 与 fd7a:115c:a1e0::/48
+#    （Windows 下 TUN 排除路由只认这个列表，开关关闭则清空）
+# ⚠️ 系统代理模式下 *.ts.net 要在界面「排除域名」里加，否则域名交给 mihomo
+#    解析会失败（MagicDNS 只有系统 DNS 能解）
 IP-CIDR,100.64.0.0/10,直连,no-resolve
 IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve
 DOMAIN-SUFFIX,ts.net,直连
+
+# Tailscale 自身流量（控制面 / DERP / UDP 打洞）必须直连：
+# TUN 模式下若被代理，UDP 打洞失败，只能走 DERP 中继（tailscale ping 显示 relay）
+# 系统代理模式下 tailscaled 不走代理，这条不生效也无害
+PROCESS-NAME,tailscaled.exe,直连
 
 # 临时：morphllm 走美国
 DOMAIN-SUFFIX,morphllm.com,美国
 
 # Antigravity 全进程走 AI：登录 / 推理 / 更新 / 扩展统一出口，避免登录地与调用地不一致触发风控
-# 需要 tun 开启 + find-process-mode: strict（脚本已满足）
+# ⚠️ PROCESS-NAME 规则依赖 Bettbox 界面「查找进程」= 开（always）；
+#    脚本里写 find-process-mode 会被界面覆盖，写了也不生效
+# 只在 TUN 模式下完整生效；系统代理模式只管走代理的那部分连接
 PROCESS-NAME,Antigravity.exe,AI

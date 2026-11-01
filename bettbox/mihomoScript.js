@@ -65,11 +65,17 @@ const ruleOptionsEnable = {
 // ⚠️ 本文件由 build-bettbox-script.mjs 自动生成，不要手改
 // 上游: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
 // 额外规则: bettbox/rules-extra.txt
+//
+// ⚠️ Bettbox 会用界面设置覆盖本脚本的同名键（源码 lib/state.dart buildPatchParams）：
+//    find-process-mode / tun 整块 / mixed-port / ipv6 / external-controller / log-level
+//    → 这些在脚本里写了也不生效，必须在界面改
+//    dns 只在界面「覆写 DNS」开启时被覆盖；rules / proxy-groups 以脚本为准
 const prefixRules = [
   // ===== 额外规则（来自 bettbox/rules-extra.txt，勿直接改本文件）=====
   'IP-CIDR,100.64.0.0/10,直连,no-resolve',
   'IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve',
   'DOMAIN-SUFFIX,ts.net,直连',
+  'PROCESS-NAME,tailscaled.exe,直连',
   'DOMAIN-SUFFIX,morphllm.com,美国',
   'PROCESS-NAME,Antigravity.exe,AI',
 
@@ -82,6 +88,7 @@ const prefixRules = [
   // 国内直连
   'RULE-SET,geolocation-cn,直连',
   'RULE-SET,games_cn,直连', // 已包含 steam 下载域名
+  'RULE-SET,synology,直连',
   'RULE-SET,nvidia_cn,直连',
   'RULE-SET,apple_cn,直连',
   'RULE-SET,microsoft_cn,直连',
@@ -263,6 +270,12 @@ const baseRuleProviders = {
     url: `${ruleSetBaseUrl}geosite/category-games@cn.mrs`,
     path: './ruleset/category-games@cn.mrs',
     'path-in-bundle': 'geo/geosite/category-games@cn.mrs',
+  },
+  synology: {
+    ...ruleProviderCommonDomain,
+    url: `${ruleSetBaseUrl}geosite/synology.mrs`,
+    path: './ruleset/synology.mrs',
+    'path-in-bundle': 'geo/geosite/synology.mrs',
   },
   nvidia_cn: {
     ...ruleProviderCommonDomain,
