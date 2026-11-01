@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/build-adblock.mjs'
+      - 'adblock/keep-apps.txt'
       - '.github/workflows/sync-adblock.yml'
 
 permissions:
@@ -28,7 +29,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: 拉取上游模块并剔除金融段
+      - name: 拉取上游模块并按白名单裁剪
         run: node scripts/build-adblock.mjs
 
       - name: 风险扫描（不阻断构建）

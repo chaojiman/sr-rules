@@ -180,13 +180,24 @@ flowchart TD
 | 1 | DNS 规则（ADLite 5 万条 + ads.list） | 零 | 独立广告域名、广告 SDK |
 | 2 | MITM 模块 | 低 | App 内信息流、开屏、弹窗 |
 
-**模块是裁剪过的**：上游 `fmz200/wool_scripts` 对 35 个银行域名开了 HTTPS 解密，这些 App 有证书固定，装了会直接无法联网。本仓库每天自动剔除全部金融类 App（银行/证券/基金/保险/钱包/支付），保留其余 686 款。
+**模块是裁剪过的**：上游 `fmz200/wool_scripts` 对 900+ 个域名开 HTTPS 解密，覆盖 700 款 App，范围越大越容易卡顿、误伤。本仓库每天自动裁剪：
+
+| 部分 | 处理 |
+| --- | --- |
+| `[Rule]` DNS 拦截 | 全部保留（零风险），只剔金融段 |
+| 解密规则（Rewrite / Map Local / Script） | 只保留 [`adblock/keep-apps.txt`](adblock/keep-apps.txt) 白名单里的 App |
+| `[MITM] hostname` | 只保留白名单 App 的域名，金融关键词兜底过滤 |
+| 金融类 App | 全部剔除（证书固定，解密即断网）；雪球/同花顺/天天基金例外 |
+| 脚本超时 | 普通 10s，protobuf（binary-body-mode）20s，上游原为 60s |
+| QUIC | 抖音/淘宝/闲鱼/知乎/拼多多/B 站直连 QUIC 单独拦截，迫使走 TCP 才能去开屏 |
+
+**新 App 想去广告**：在上游模块里搜 `# > App名`，把段名原样加进 `keep-apps.txt` 并提交，CI 自动重建。
 
 配置里还有第二重保险：
 
 ```ini
 [MITM]
-hostname = -*.ccb.com,-*.icbc.com.cn,-*.abchina.com,...   # 26 条金融域名负向排除
+hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名负向排除
 ```
 
 即使以后误装了别的模块，这些域名也永远不会被解密。
@@ -269,7 +280,7 @@ flowchart LR
     W2 --> O2[bettbox/mihomoScript.js]
 
     U3[fmz200/wool_scripts] -->|每天 05:00| W3[sync-adblock]
-    W3 -->|剔除全部金融 App| O3[adblock/blockAds.srmodule]
+    W3 -->|按白名单裁剪 + 剔除金融| O3[adblock/blockAds.srmodule]
 ```
 
 改 A 不影响 B、C。
@@ -291,7 +302,8 @@ flowchart LR
 | Bettbox 临时规则 | `bettbox/rules-extra.txt` |
 | 规则集分类增删 | `scripts/build-shadowrocket.mjs` 的 `GEOSITE` |
 | Bettbox 补丁 | `scripts/build-bettbox.mjs` 的 `REPLACES` |
-| 去广告剔除范围 | `scripts/build-adblock.mjs` 的 `FIN_SECTION` |
+| 去广告 App 白名单 | `adblock/keep-apps.txt` |
+| 去广告金融剔除 / QUIC 拦截 | `scripts/build-adblock.mjs` 的 `FIN_SECTION` / `QUIC_BLOCK` |
 
 本地生成：
 
@@ -343,4 +355,4 @@ A：不能。去广告模块依赖 MITM，而 MITM 需要代理接管流量。
 - 去广告模块：[fmz200/wool_scripts](https://github.com/fmz200/wool_scripts)
 - 覆写脚本：[AIsouler/MyClash](https://github.com/AIsouler/MyClash)
 
-本仓库只做格式转换、顺序调整和金融类剔除，不主张规则内容的所有权。
+本仓库只做格式转换、顺序调整和按白名单裁剪，不主张规则内容的所有权。

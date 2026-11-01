@@ -1,163 +1,208 @@
 /**
- * 拉取 fmz200/wool_scripts 的 blockAds 模块，剔除全部金融类 App，
+ * 拉取 fmz200/wool_scripts 的 blockAds 模块，按「自用 App 白名单」裁剪，
  * 输出到 adblock/blockAds.srmodule 供小火箭安装。
  *
- * 为什么剔除：
- *   上游模块对 33 个银行域名开启 MITM（工行/建行/农行/中行/招行/浦发/民生/
- *   交行/邮储/中信/光大/兴业/北京/江苏/吉林/广发/平安…），这些 App 普遍有
- *   证书固定，解密后直接无法联网。必须剔除。
+ * 裁剪策略：
+ *   1. [Rule]（DNS 层 REJECT，零风险）：全部保留，只剔除金融段
+ *   2. 解密段（Header/URL/Body Rewrite、Map Local、Script）：
+ *      只保留 adblock/keep-apps.txt 列出的 App 段，其余整段删除
+ *   3. [MITM] hostname：只保留白名单 App 段注释里声明、且上游确实开启的域名；
+ *      再过一遍金融关键词与 DOMAIN_PATTERNS，命中即剔除
+ *   4. Script 超时：普通脚本 10s，binary-body-mode（protobuf 解析）20s
+ *   5. 对直连 App 追加 QUIC 拦截，迫使其走 TCP，MITM 才能生效
  *
- * 剔除范围：
- *   1. [MITM] hostname 列表中的金融域名
- *   2. 段落名命中金融关键词的整段（Rule / URL Rewrite / Map Local / Script…）
+ * 为什么剔除金融：银行/证券/保险/支付 App 普遍有证书固定，解密即断网。
+ * FIN_ALLOW 列出的是用户明确要保留去广告的金融 App（实测可解密）。
  *
- * 其余规则、脚本、上游更新全部保留。
+ * 末尾有断言：金融域名残留、hostname 粘连等问题直接让构建失败。
  *
- * 用法: node build-adblock.mjs [--check]
+ * 用法: node build-adblock.mjs [--check] [--src=<URL|本地文件>]
  */
 import fs from 'fs';
 import path from 'path';
 
-const SRC = 'https://raw.githubusercontent.com/fmz200/wool_scripts/main/Shadowrocket/module/blockAds.srmodule';
+const DEFAULT_SRC = 'https://raw.githubusercontent.com/fmz200/wool_scripts/main/Shadowrocket/module/blockAds.srmodule';
+const SRC = process.argv.find((a) => a.startsWith('--src='))?.slice(6) || DEFAULT_SRC;
 const OUT = path.resolve('adblock/blockAds.srmodule');
+const KEEP_FILE = path.resolve('adblock/keep-apps.txt');
 const CHECK_ONLY = process.argv.includes('--check');
 
-// ── 段落名命中即整段删除 ──────────────────────────────
-const FIN_SECTION = /(银行|信用卡|证券|基金|保险|金融|钱包|支付|银联|农商)/;
+// ── 白名单 ───────────────────────────────────────────
+const KEEP = new Set(
+  fs
+    .readFileSync(KEEP_FILE, 'utf8')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s && !s.startsWith('#')),
+);
 
-// ── 域名黑名单（MITM 列表 + 保险丝）────────────────────
-// 只匹配域名结尾，不会误伤 xxxbank.com.cn 之外的东西
+// 金融类中用户明确保留的 App（段名需与上游一致，且也要写进 keep-apps.txt）
+const FIN_ALLOW = new Set(['雪球', '同花顺', '天天基金']);
+
+// ── 段落名命中即视为金融段 ──────────────────────────────
+const FIN_SECTION = /(银行|信用卡|证券|基金|保险|金融|钱包|支付|银联|农商|财富|智投|人寿|人保|平安|福享太平|友邦|富途|币安|币世界|拉卡拉|分期|翼支付)/;
+
+// ── 金融域名关键词（MITM 兜底过滤）────────────────────
+const FIN_HOST =
+  /(bank|pingan|gtja|htsc|cmschina|ecitic|creditcard|95508|95516|95598pay|futunn|yxzq|bestpay|lakala|helipay|binance|bishijie|chinalife|epicc|cntaiping|aia\.com|51credit|cibfintech|hsbc|cgws|chinahxzq|sdb\.com\.cn|spdbccc|z-bank|alipay|tenpay|unionpay|cmbchina|10jqka|dfcfw|1234567|xueqiu)/i;
+
+// ── 域名黑名单（精确豁免，不随白名单变化）──────────────
 const DOMAIN_PATTERNS = [
-  /(^|\.)ccb\.com$/,
-  /(^|\.)ccb\.com\.cn$/,
+  /(^|\.)ccb\.com(\.cn)?$/,
   /(^|\.)icbc\.com\.cn$/,
   /(^|\.)abchina\.com(\.cn)?$/,
   /(^|\.)boc\.cn$/,
   /(^|\.)bankofchina\.com$/,
-  /(^|\.)cmbchina\.com$/,
   /(^|\.)psbc\.com$/,
-  /(^|\.)bankcomm\.com$/,
-  /(^|\.)bankcomm\.cn$/,
+  /(^|\.)bankcomm\.(com|cn)$/,
   /(^|\.)spdb\.com\.cn$/,
   /(^|\.)citicbank\.com$/,
   /(^|\.)cmbc\.com\.cn$/,
   /(^|\.)hxb\.com\.cn$/,
   /(^|\.)cebbank\.com$/,
-  /(^|\.)bankofbeijing\.com\.cn$/,
-  /(^|\.)jsbchina\.cn$/,
-  /(^|\.)jlbank\.com\.cn$/,
-  /(^|\.)cgbchina\.com\.cn$/,
   /(^|\.)cib\.com\.cn$/,
-  /(^|\.)cmbchina\.com$/,
-  /(^|\.)95516\.com$/,
-  /(^|\.)unionpay\.com$/,
-  /(^|\.)unionpaysecure\.com$/,
-  /(^|\.)alipay\.com$/,
-  /(^|\.)alipayobjects\.com$/,
-  /(^|\.)tenpay\.com$/,
-  /(^|\.)tenpay\.com\.cn$/,
-  /(^|\.)qianbao\.qq\.com$/,          // QQ 钱包
-  /(^|\.)1qianbao\.com$/,             // 平安壹钱包
-  /(^|\.)payapp\.weixin\.qq\.com$/,   // 微信支付
-  /(^|\.)wx\.tenpay\.com$/,
-  /(^|\.)paas\.cmbchina\.com$/,
-  // 已在 DNS 层 REJECT，无需解密
-  /(^|\.)dns\.jd\.com$/,
+  /(^|\.)cgbchina\.com\.cn$/,
+  /(^|\.)qianbao\.qq\.com$/, // QQ 钱包
+  /(^|\.)1qianbao\.com$/, // 平安壹钱包
+  /(^|\.)payapp\.weixin\.qq\.com$/, // 微信支付
+  /(^|\.)dns\.jd\.com$/, // 已在 DNS 层 REJECT，无需解密
 
-  // ── 速度优先：京东主 API 不解密 ──
-  // api.m.jd.com 承载搜索、商品详情、订单、首页 tab 等全部核心请求。
-  // 一旦解密并被 http-response 脚本处理（requires-body 要缓冲完整响应体），
-  // 浏览和搜索会明显变卡。开屏广告也随之放弃。
-  // 京东独立广告域名（jzt/img-x/dsp-x/kepler/mapi.m…）仍由 DNS 层 13 条规则拦截。
+  // 速度优先：京东主 API 承载搜索/详情/订单，解密 + requires-body 会明显变卡
   /(^|\.)api\.m\.jd\.com$/,
 
-  // ── 可用性豁免：主 API 被 Map Local 返回 {} 会导致 App 无法使用 ──
-  // 山姆：模块对该域名有 1 条 reject + 6 条 Map Local，其中包含
-  //       getAppVersionUpdateInfo（版本检查）和 beUpdate（配置更新），
-  //       返回空对象会让 App 判定启动异常、无法进入。
+  // 可用性豁免：山姆主 API 被 Map Local 返回 {} 会导致 App 无法使用
   /(^|\.)api-sams\.walmartmobile\.cn$/,
 ];
+
+// ── 直连 App 的 QUIC 拦截 ─────────────────────────────
+// 配置里 block-quic = all-proxy 只拦代理流量；这些国内 App 直连走 QUIC 时
+// 绕过 MITM，开屏/信息流去不掉。只拦这几个域名，不动全局。
+const QUIC_BLOCK = ['amemv.com', 'snssdk.com', 'taobao.com', 'goofish.com', 'zhihu.com', 'pinduoduo.com', 'yangkeduo.com', 'bilibili.com', 'biliapi.net'];
 
 // ── 规则改写（在剔除之后应用）──────────────────────────
 const REPLACES = [
   {
-    // 京东主 App 的响应脚本原本覆盖 7 个接口，其中 getTabHomeInfo / myOrderInfo
-    // 等响应体很大，requires-body 会缓冲完整响应，导致启动、搜索明显卡顿。
-    // 只保留启动与欢迎页两个接口 —— 开屏广告就在这两个里面。
+    // 京东脚本只保留启动与欢迎页两个接口（开屏广告就在这两个里）
     name: '京东脚本收窄到启动接口',
-    required: true,
+    required: false,
     from: /pattern=\^https:\\\/\\\/api\\\.m\\\.jd\\\.com\\\/client\\\.action\\\?functionId=\([^)]*\)/,
     to: 'pattern=^https:\\/\\/api\\.m\\.jd\\.com\\/client\\.action\\?functionId=(start|welcomeHome)',
   },
-  {
-    // 脚本超时从 60s 降到 8s，避免脚本异常时挂死请求
-    name: '京东脚本超时收紧',
-    required: false,
-    from: /(script-path=https:\/\/raw\.githubusercontent\.com\/fmz200\/wool_scripts\/main\/Scripts\/jingdong\/jingdong\.js, requires-body=true, timeout=)\d+/,
-    to: '$18',
-  },
 ];
 
-const isFinHost = (h) => DOMAIN_PATTERNS.some((re) => re.test(h));
+const MITM_SECS = new Set(['Header Rewrite', 'URL Rewrite', 'Body Rewrite', 'Map Local', 'Script']);
+const cleanHost = (h) => h.trim().replace(/hostname$/i, '');
+const isFinSection = (n) => FIN_SECTION.test(n) && !FIN_ALLOW.has(n);
+const isBlockedHost = (h) => DOMAIN_PATTERNS.some((re) => re.test(h));
 
-// ── 执行 ─────────────────────────────────────────────
-const res = await fetch(SRC, { signal: AbortSignal.timeout(60000) });
-if (!res.ok) throw new Error(`${SRC} → HTTP ${res.status}`);
-const src = (await res.text()).replace(/\r\n/g, '\n');
+// ── 读取上游 ─────────────────────────────────────────
+let src;
+if (/^https?:/.test(SRC)) {
+  const res = await fetch(SRC, { signal: AbortSignal.timeout(60000) });
+  if (!res.ok) throw new Error(`${SRC} → HTTP ${res.status}`);
+  src = await res.text();
+} else {
+  src = fs.readFileSync(SRC, 'utf8');
+}
+src = src.replace(/\r\n/g, '\n');
 const lines = src.split('\n');
 
-const out = [];
-let skip = false;
-const removedSections = [];
-const removedHosts = new Set();
-
-// 段落边界：'# > ' 标题 / '# >>>' 分隔 / '[Section]' 段头
-const isBoundary = (l) => /^# > /.test(l) || /^# >>>/.test(l) || /^\[.+\]$/.test(l);
-
-for (const line of lines) {
-  // 段落删除状态机
-  if (isBoundary(line)) {
-    if (/^# > /.test(line)) {
-      const name = line.slice(4).trim();
-      if (FIN_SECTION.test(name)) {
-        skip = true;
-        removedSections.push(name);
-      } else {
-        skip = false;
+// ── 第一遍：段名 → 声明的 hostname；上游 MITM 列表 ─────
+const hostOwner = new Map(); // host → Set<段名>
+let upstreamHosts = [];
+{
+  let sec = '';
+  let name = '';
+  for (const l of lines) {
+    let m;
+    if ((m = l.match(/^\[(.+)\]$/))) { sec = m[1]; name = ''; continue; }
+    if (/^# >>>/.test(l)) { name = ''; continue; }
+    if ((m = l.match(/^# > (.+)/))) { name = m[1].trim(); continue; }
+    if (sec === 'MITM' && /^hostname\s*=/.test(l)) {
+      upstreamHosts = l.replace(/^hostname\s*=\s*(%APPEND%)?\s*/, '').split(',').map(cleanHost).filter(Boolean);
+      continue;
+    }
+    if (name && (m = l.match(/^#\s*hostname\s*=\s*(.+)/))) {
+      for (const h of m[1].split(',').map(cleanHost).filter(Boolean)) {
+        if (!hostOwner.has(h)) hostOwner.set(h, new Set());
+        hostOwner.get(h).add(name);
       }
-    } else if (!/^# > /.test(line)) {
-      skip = false; // 分隔符 / 段头 → 退出跳过
     }
   }
-
-  // MITM 行：按域名过滤（在 skip 判断之外，因为 MITM 永远是独立的一行）
-  if (/^hostname\s*=\s*%APPEND%/.test(line)) {
-    const head = 'hostname = %APPEND% ';
-    const hosts = line
-      .slice(head.length)
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const kept = [];
-    for (const h of hosts) {
-      if (isFinHost(h)) removedHosts.add(h);
-      else kept.push(h);
-    }
-    out.push(head + kept.join(', '));
-    continue;
-  }
-
-  if (skip) continue;
-  out.push(line);
 }
+
+// ── 第二遍：按段裁剪 ─────────────────────────────────
+const out = [];
+const seenSections = new Set();
+const keptMitmSections = new Set();
+const droppedFin = new Set();
+let droppedMitmRules = 0;
+let orphanRules = 0;
+const timeoutStat = { 10: 0, 20: 0 };
+{
+  let sec = '';
+  let name = '';
+  for (let line of lines) {
+    let m;
+    if ((m = line.match(/^\[(.+)\]$/))) {
+      sec = m[1];
+      name = '';
+      if (sec === 'MITM') break; // MITM 段末尾单独重建
+      out.push(line);
+      if (sec === 'Rule') {
+        out.push('# > QUIC 拦截（sr-rules 追加：直连 App 回退 TCP，MITM 才能生效）');
+        for (const d of QUIC_BLOCK) out.push(`AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,${d})),REJECT`);
+        out.push('');
+      }
+      continue;
+    }
+    if (/^# >>>/.test(line)) { name = ''; out.push(line); continue; }
+    if ((m = line.match(/^# > (.+)/))) name = m[1].trim();
+
+    const inMitm = MITM_SECS.has(sec);
+    if (name) seenSections.add(name);
+
+    // 金融段：所有分区一律删除（FIN_ALLOW 除外）
+    if (name && isFinSection(name)) { droppedFin.add(name); continue; }
+
+    if (inMitm) {
+      const isRule = line.trim() && !line.startsWith('#');
+      if (!name) {
+        if (isRule) { orphanRules++; continue; } // 无归属规则：不认识的 App，删除
+        out.push(line);
+        continue;
+      }
+      if (!KEEP.has(name)) { if (isRule) droppedMitmRules++; continue; }
+      if (isRule) keptMitmSections.add(name);
+
+      if (sec === 'Script' && isRule) {
+        const t = /binary-body-mode\s*=\s*(true|1)/.test(line) ? 20 : 10;
+        line = /timeout\s*=\s*\d+/.test(line) ? line.replace(/timeout\s*=\s*\d+/, `timeout=${t}`) : `${line}, timeout=${t}`;
+        timeoutStat[t]++;
+      }
+    }
+    out.push(line);
+  }
+}
+
+// ── 重建 MITM hostname ───────────────────────────────
+const keptHosts = [];
+const removed = { notKept: 0, fin: new Set(), blocked: new Set() };
+for (const h of [...new Set(upstreamHosts)]) {
+  const owners = [...(hostOwner.get(h) || [])].filter((n) => KEEP.has(n) && !isFinSection(n));
+  if (owners.length === 0) { removed.notKept++; continue; }
+  if (isBlockedHost(h)) { removed.blocked.add(h); continue; }
+  if (FIN_HOST.test(h) && !owners.some((n) => FIN_ALLOW.has(n))) { removed.fin.add(h); continue; }
+  keptHosts.push(h);
+}
+out.push('[MITM]', `hostname = %APPEND% ${keptHosts.join(', ')}`, '');
 
 let result = out.join('\n');
 
-// 先应用规则改写
 const repReport = [];
 for (const p of REPLACES) {
-  const hit = typeof p.from === 'string' ? result.includes(p.from) : p.from.test(result);
-  if (!hit) {
+  if (!p.from.test(result)) {
     repReport.push(`${p.required ? '❌' : '⚠️ '} ${p.name} —— 锚点未命中`);
     continue;
   }
@@ -165,20 +210,38 @@ for (const p of REPLACES) {
   repReport.push(`✅ ${p.name}`);
 }
 
-// 头部改写：指向自己的仓库，避免「检查更新」跳回上游把金融段装回来
+// 头部改写：指向自己的仓库，避免「检查更新」跳回上游
 result = result
-  .replace(/^#!name=.*/m, '#!name=广告拦截(已剔金融版)')
-  .replace(/^#!desc=.*/m, '#!desc=基于 fmz200/blockAds 裁剪，已移除全部银行/证券/支付类 App（上游对这些域名开 MITM，会致银行 App 无法联网）')
+  .replace(/^#!name=.*/m, '#!name=广告拦截(自用白名单版)')
+  .replace(/^#!desc=.*/m, `#!desc=基于 fmz200/blockAds 裁剪：仅对 ${keptMitmSections.size} 款自用 App 做 MITM 去广告，已剔除金融类（雪球/同花顺/天天基金除外）；其余 App 仅 DNS 层拦截`)
   .replace(/^#!homepage=.*/m, '#!homepage=https://github.com/chaojiman/sr-rules')
   .replace(/^#!raw-url=.*/m, '#!raw-url=https://github.com/chaojiman/sr-rules/raw/main/adblock/blockAds.srmodule');
 
+// ── 报告 ─────────────────────────────────────────────
+const missing = [...KEEP].filter((n) => !seenSections.has(n));
 console.log(`上游 ${(src.length / 1024).toFixed(0)} KB → 输出 ${(result.length / 1024).toFixed(0)} KB`);
-console.log(`剔除段落 ${removedSections.length} 个：${[...new Set(removedSections)].join('、') || '（无）'}`);
-console.log(`剔除 MITM 域名 ${removedHosts.size} 个：${[...removedHosts].join(', ') || '（无）'}`);
+console.log(`白名单 ${KEEP.size} 个，实际保留解密规则的 App ${keptMitmSections.size} 个`);
+console.log(`剔除段落（金融）${droppedFin.size} 个：${[...droppedFin].join('、') || '（无）'}`);
+console.log(`剔除非白名单解密规则 ${droppedMitmRules} 条，无归属规则 ${orphanRules} 条`);
+console.log(`MITM 域名 ${upstreamHosts.length} → ${keptHosts.length}（非白名单 ${removed.notKept}，金融 ${removed.fin.size}，豁免 ${removed.blocked.size}）`);
+if (removed.fin.size) console.log(`  金融域名：${[...removed.fin].join(', ')}`);
+console.log(`Script 超时：10s × ${timeoutStat[10]}，20s × ${timeoutStat[20]}`);
 console.log(repReport.join('\n'));
+if (missing.length) console.log(`⚠️  白名单中上游不存在的段名：${missing.join('、')}`);
 
-if (removedSections.length === 0 && removedHosts.size === 0) {
-  console.error('⚠️ 没有剔除任何内容 —— 上游结构可能已变，请人工检查');
+// ── 断言 ─────────────────────────────────────────────
+const errors = [];
+const finLeft = keptHosts.filter((h) => FIN_HOST.test(h) && ![...(hostOwner.get(h) || [])].some((n) => FIN_ALLOW.has(n)));
+if (finLeft.length) errors.push(`金融域名残留：${finLeft.join(', ')}`);
+const glued = keptHosts.filter((h) => /hostname|\s/i.test(h));
+if (glued.length) errors.push(`hostname 粘连：${glued.join(', ')}`);
+const blockedLeft = keptHosts.filter(isBlockedHost);
+if (blockedLeft.length) errors.push(`豁免域名残留：${blockedLeft.join(', ')}`);
+if (keptHosts.length < 50) errors.push(`MITM 域名只剩 ${keptHosts.length} 个，上游结构可能已变`);
+if (/^[^#\n].*timeout=60\b/m.test(result)) errors.push('仍有 timeout=60 的脚本');
+if (errors.length) {
+  console.error('❌ 断言失败：\n  ' + errors.join('\n  '));
+  process.exit(1);
 }
 
 if (CHECK_ONLY) {
