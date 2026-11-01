@@ -78,7 +78,23 @@ const DOMAIN_PATTERNS = [
 // ── 直连 App 的 QUIC 拦截 ─────────────────────────────
 // 配置里 block-quic = all-proxy 只拦代理流量；这些国内 App 直连走 QUIC 时
 // 绕过 MITM，开屏/信息流去不掉。只拦这几个域名，不动全局。
-const QUIC_BLOCK = ['amemv.com', 'snssdk.com', 'taobao.com', 'goofish.com', 'zhihu.com', 'pinduoduo.com', 'yangkeduo.com', 'bilibili.com', 'biliapi.net'];
+const QUIC_BLOCK = ['amemv.com', 'snssdk.com', 'taobao.com', 'goofish.com', 'zhihu.com', 'pinduoduo.com', 'yangkeduo.com', 'bilibili.com', 'biliapi.net', 'hongyibo.com.cn'];
+
+// ── 上游缺失的 App，自补规则（追加到 [Map Local]）──────────
+// 酷狗概念版：来源 luestr「酷狗概念版去广告」，只取广告/开屏接口；
+// 未取 user/v1/init、experiment/get_params 等（返回 {} 可能致 App 异常）
+const EXTRA = [
+  {
+    name: '酷狗概念版',
+    hosts: ['gateway.kugou.com'],
+    mapLocal: [
+      '^https:\\/\\/gateway\\.kugou\\.com\\/youth\\/v1\\/start_img\\/last\\?',
+      '^https:\\/\\/gateway\\.kugou\\.com\\/ads\\.service\\/',
+      '^https:\\/\\/gateway\\.kugou\\.com\\/ads\\.gateway\\/',
+    ],
+  },
+];
+const JSON_EMPTY = ' data-type=text data="{}" status-code=200 header="Content-Type:application/json"';
 
 // ── 规则改写（在剔除之后应用）──────────────────────────
 const REPLACES = [
@@ -155,6 +171,13 @@ const timeoutStat = { 10: 0, 20: 0 };
         for (const d of QUIC_BLOCK) out.push(`AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,${d})),REJECT`);
         out.push('');
       }
+      if (sec === 'Map Local') {
+        for (const e of EXTRA) {
+          out.push(`# > ${e.name}（sr-rules 自补）`, `# hostname = ${e.hosts.join(', ')}`);
+          for (const p of e.mapLocal) out.push(p + JSON_EMPTY);
+          out.push('');
+        }
+      }
       continue;
     }
     if (/^# >>>/.test(line)) { name = ''; out.push(line); continue; }
@@ -196,6 +219,7 @@ for (const h of [...new Set(upstreamHosts)]) {
   if (FIN_HOST.test(h) && !owners.some((n) => FIN_ALLOW.has(n))) { removed.fin.add(h); continue; }
   keptHosts.push(h);
 }
+for (const h of EXTRA.flatMap((e) => e.hosts)) if (!keptHosts.includes(h)) keptHosts.push(h);
 out.push('[MITM]', `hostname = %APPEND% ${keptHosts.join(', ')}`, '');
 
 let result = out.join('\n');
