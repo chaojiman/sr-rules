@@ -29,7 +29,8 @@ const extraRules = fs.existsSync(EXTRA_FILE)
 
 const extraBlock = extraRules.length
   ? `  // ===== 额外规则（来自 bettbox/rules-extra.txt，勿直接改本文件）=====\n` +
-    extraRules.map((l) => `  '${l.replace(/'/g, "\\'")}',`).join('\n') +
+    // 转义顺序：先反斜杠再单引号（PROCESS-PATH-REGEX 含 \\，不转义会被 JS 字符串吞掉）
+    extraRules.map((l) => `  '${l.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',`).join('\n') +
     '\n'
   : '';
 

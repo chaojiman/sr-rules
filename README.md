@@ -260,10 +260,13 @@ node scripts/check-adblock-risk.mjs
 
 ```
 DOMAIN-SUFFIX,example.com,美国
-PROCESS-NAME,Antigravity.exe,AI
+PROCESS-PATH-REGEX,(?i)\\antigravity\\,AI
 ```
 
 改完推上去 → Action 几分钟内重建 → Bettbox 重连生效。
+
+> 进程类规则（`PROCESS-NAME` / `PROCESS-PATH-REGEX`）需要 Bettbox 界面「查找进程」打开。
+> 系统代理模式下 Antigravity 的 `language_server.exe` 不读系统代理，用 [`bettbox/Antigravity-proxy.cmd`](bettbox/Antigravity-proxy.cmd) 启动。
 
 ---
 

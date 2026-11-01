@@ -77,7 +77,7 @@ const prefixRules = [
   'DOMAIN-SUFFIX,ts.net,直连',
   'PROCESS-NAME,tailscaled.exe,直连',
   'DOMAIN-SUFFIX,morphllm.com,美国',
-  'PROCESS-NAME,Antigravity.exe,AI',
+  'PROCESS-PATH-REGEX,(?i)\\\\antigravity\\\\,AI',
 
   // 规则集下载域名，避免出现鸡蛋问题
   'DOMAIN,cdn.jsdmirror.com,直连',
