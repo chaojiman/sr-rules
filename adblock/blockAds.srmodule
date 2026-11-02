@@ -3640,15 +3640,6 @@ DOMAIN-SUFFIX,sqtpks3.1391.com,REJECT
 # 微信小程序
 DOMAIN,et.ykccn.com,REJECT
 
-# > 云闪付
-DOMAIN,ads.95516.com,REJECT
-DOMAIN,cm-10-138.getui.com,REJECT
-DOMAIN,sdk.open.talk.getui.net,REJECT
-DOMAIN,sdk-conf.getui.com,REJECT
-DOMAIN,switch.cup.com.cn,REJECT
-DOMAIN,tysdk.95516.com,REJECT
-DOMAIN,ads.cup.com.cn,REJECT
-
 # > 云之家
 DOMAIN-SUFFIX,ad.yunzhijia.com,REJECT
 

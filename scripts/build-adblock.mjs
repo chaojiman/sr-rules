@@ -41,11 +41,11 @@ const KEEP = new Set(
 const FIN_ALLOW = new Set(['雪球', '同花顺', '天天基金']);
 
 // ── 段落名命中即视为金融段 ──────────────────────────────
-const FIN_SECTION = /(银行|信用卡|证券|基金|保险|金融|钱包|支付|银联|农商|财富|智投|人寿|人保|平安|福享太平|友邦|富途|币安|币世界|拉卡拉|分期|翼支付)/;
+const FIN_SECTION = /(银行|信用卡|证券|基金|保险|金融|钱包|支付|银联|云闪付|农商|财富|智投|人寿|人保|平安|福享太平|友邦|富途|币安|币世界|拉卡拉|分期|翼支付)/;
 
 // ── 金融域名关键词（MITM 兜底过滤）────────────────────
 const FIN_HOST =
-  /(bank|pingan|gtja|htsc|cmschina|ecitic|creditcard|95508|95516|95598pay|futunn|yxzq|bestpay|lakala|helipay|binance|bishijie|chinalife|epicc|cntaiping|aia\.com|51credit|cibfintech|hsbc|cgws|chinahxzq|sdb\.com\.cn|spdbccc|z-bank|alipay|tenpay|unionpay|cmbchina|10jqka|dfcfw|1234567|xueqiu)/i;
+  /(bank|pingan|gtja|htsc|cmschina|ecitic|creditcard|95508|95516|95598pay|futunn|yxzq|bestpay|lakala|helipay|binance|bishijie|chinalife|epicc|cntaiping|aia\.com|51credit|cibfintech|hsbc|cgws|chinahxzq|sdb\.com\.cn|spdbccc|z-bank|alipay|tenpay|unionpay|cup\.com\.cn|cmbchina|10jqka|dfcfw|1234567|xueqiu)/i;
 
 // ── 域名黑名单（精确豁免，不随白名单变化）──────────────
 const DOMAIN_PATTERNS = [

@@ -187,7 +187,7 @@ flowchart TD
 | `[Rule]` DNS 拦截 | 全部保留（零风险），只剔金融段 |
 | 解密规则（Rewrite / Map Local / Script） | 只保留 [`adblock/keep-apps.txt`](adblock/keep-apps.txt) 白名单里的 App |
 | `[MITM] hostname` | 只保留白名单 App 的域名，金融关键词兜底过滤 |
-| 金融类 App | 全部剔除（证书固定，解密即断网）；雪球/同花顺/天天基金例外 |
+| 金融类 App | 全部剔除（证书固定，解密即断网）；雪球/同花顺/天天基金例外。**段名要命中 `FIN_SECTION` 关键词**，`云闪付` 这种不含金融字样的段名需显式补进正则 |
 | 脚本超时 | 普通 10s，protobuf（binary-body-mode）20s，上游原为 60s |
 | QUIC | 抖音/淘宝/闲鱼/知乎/拼多多/B 站直连 QUIC 单独拦截，迫使走 TCP 才能去开屏 |
 
@@ -201,6 +201,14 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 ```
 
 即使以后误装了别的模块，这些域名也永远不会被解密。
+
+> ⚠️ **模块 `[Rule]` 优先于 `config.conf`**（与配置内的顺序无关）。模块里的 `REJECT` 会盖掉配置里的 `DIRECT`，
+> 所以在 `config.conf` 里补一条 `DOMAIN-SUFFIX,xxx,DIRECT` **救不了**被模块误伤的域名 —— 只能改构建脚本
+> 或关掉模块。
+>
+> 已踩过：`# > 云闪付` 段的 `switch.cup.com.cn`（活动开关下发）、`tysdk.95516.com`、`ads.cup.com.cn`
+> 被 REJECT，云闪付活动区空白。该段名不含「银联 / 支付」等关键词，金融剔除逻辑没拦住，
+> 而 `[Rule]` 是「全部保留」，于是整段生效。
 
 **出问题怎么回滚**：
 
