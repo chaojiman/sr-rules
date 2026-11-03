@@ -109,7 +109,10 @@ const REPLACES = [
 
 const MITM_SECS = new Set(['Header Rewrite', 'URL Rewrite', 'Body Rewrite', 'Map Local', 'Script']);
 const cleanHost = (h) => h.trim().replace(/hostname$/i, '');
-const isFinSection = (n) => FIN_SECTION.test(n) && !FIN_ALLOW.has(n);
+// [Rule] 段里出现银联/云闪付域名的段，即使段名不含金融字样也按金融段处理（段名被上游改掉时的兜底）
+const FIN_RULE_HOST = /(^|\.)(95516\.com|cup\.com\.cn|unionpay\.com)$/i;
+const finByRuleHost = new Set();
+const isFinSection = (n) => (FIN_SECTION.test(n) || finByRuleHost.has(n)) && !FIN_ALLOW.has(n);
 const isBlockedHost = (h) => DOMAIN_PATTERNS.some((re) => re.test(h));
 
 // ── 读取上游 ─────────────────────────────────────────
@@ -137,6 +140,10 @@ let upstreamHosts = [];
     if ((m = l.match(/^# > (.+)/))) { name = m[1].trim(); continue; }
     if (sec === 'MITM' && /^hostname\s*=/.test(l)) {
       upstreamHosts = l.replace(/^hostname\s*=\s*(%APPEND%)?\s*/, '').split(',').map(cleanHost).filter(Boolean);
+      continue;
+    }
+    if (sec === 'Rule' && name && (m = l.match(/^(?:DOMAIN|DOMAIN-SUFFIX),([^,\s]+),/)) && FIN_RULE_HOST.test(m[1])) {
+      finByRuleHost.add(name);
       continue;
     }
     if (name && (m = l.match(/^#\s*hostname\s*=\s*(.+)/))) {
