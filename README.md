@@ -38,13 +38,16 @@
 覆写 / 脚本设置 → 填脚本地址 → 更新 → 重连
 ```
 
-### 三条地址
+### 四条地址
 
 ```
-配置  https://raw.githubusercontent.com/chaojiman/sr-rules/main/shadowrocket/config.conf
-脚本  https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.js
-模块  https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds.srmodule
+配置      https://raw.githubusercontent.com/chaojiman/sr-rules/main/shadowrocket/config.conf
+脚本      https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.js
+模块      https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds.srmodule
+模块-DNS  https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds-dns.srmodule
 ```
+
+> 模块和模块-DNS **二选一**：前者带 MITM 去开屏（会变卡），后者零开销。详见下文「两个模块，二选一」。
 
 > 大陆拉不动 raw.githubusercontent.com 时，把 `https://raw.githubusercontent.com/chaojiman/sr-rules/main/`
 > 换成 `https://cdn.jsdelivr.net/gh/chaojiman/sr-rules@main/`
@@ -179,6 +182,19 @@ flowchart TD
 | --- | --- | --- | --- |
 | 1 | DNS 规则（ADLite 5 万条 + ads.list） | 零 | 独立广告域名、广告 SDK |
 | 2 | MITM 模块 | 低 | App 内信息流、开屏、弹窗 |
+
+### 两个模块，二选一
+
+| 模块 | 内容 | 性能 | 能拦什么 |
+| --- | --- | --- | --- |
+| [blockAds-dns.srmodule](adblock/blockAds-dns.srmodule) | 只有 `[Rule]` 段（2,950 条 REJECT），**无 MITM、无脚本** | **零开销**，等同于没装模块 | 独立广告域名、广告 SDK |
+| [blockAds.srmodule](adblock/blockAds.srmodule) | `[Rule]` + MITM 191 域名 + 94 条脚本 + 209 条 Map Local | **有开销**：命中域名要解密 + 缓冲整个响应体 + 跑 JS | 上面全部 + App 内开屏 / 信息流 / 弹窗 |
+
+**iOS 上打开网页明显变卡时，换 `-dns` 版。** 实测：完整版对 `www.baidu.com`、`www.zhihu.com`、
+`edith.xiaohongshu.com`、`mp.weixin.qq.com` 这类日常高频站做解密 + `requires-body` 缓冲，
+是卡顿主因；`-dns` 版没有任何解密，体验和装模块前完全一致。
+
+> 两个模块**不要同时装**，规则会重复。
 
 **模块是裁剪过的**：上游 `fmz200/wool_scripts` 对 900+ 个域名开 HTTPS 解密，覆盖 700 款 App，范围越大越容易卡顿、误伤。本仓库每天自动裁剪：
 

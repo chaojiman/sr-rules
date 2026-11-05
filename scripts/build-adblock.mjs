@@ -24,6 +24,8 @@ import path from 'path';
 const DEFAULT_SRC = 'https://raw.githubusercontent.com/fmz200/wool_scripts/main/Shadowrocket/module/blockAds.srmodule';
 const SRC = process.argv.find((a) => a.startsWith('--src='))?.slice(6) || DEFAULT_SRC;
 const OUT = path.resolve('adblock/blockAds.srmodule');
+// 零解密版：只保留 [Rule] 段，不含 MITM / 脚本 / Map Local，装它不产生任何解密开销
+const DNS_OUT = path.resolve('adblock/blockAds-dns.srmodule');
 const KEEP_FILE = path.resolve('adblock/keep-apps.txt');
 const CHECK_ONLY = process.argv.includes('--check');
 
@@ -280,11 +282,46 @@ if (CHECK_ONLY) {
   process.exit(0);
 }
 
+// ── 生成零解密版（仅 [Rule] 段）──────────────────────
+// 背景：MITM 191 个域名 + 94 条 requires-body 脚本会让日常高频站（百度/知乎/小红书/
+// 微信/携程…）每次请求都经历「解密 → 缓冲整个响应体 → 跑 JS → 重加密」，实测明显卡顿。
+// 这个版本只保留 DNS 层 REJECT，零解密、零脚本，性能开销等同于没有模块。
+function buildDnsOnly(full) {
+  const fl = full.split('\n');
+  const firstSec = fl.findIndex((l) => /^\[.+\]$/.test(l.trim()));
+  const header = fl.slice(0, firstSec < 0 ? 0 : firstSec);
+  const s = fl.findIndex((l) => l.trim() === '[Rule]');
+  if (s < 0) throw new Error('未找到 [Rule] 段，无法生成零解密版');
+  const e = fl.findIndex((l, i) => i > s && /^\[.+\]$/.test(l.trim()));
+  const ruleSec = fl.slice(s, e < 0 ? fl.length : e);
+  return [
+    ...header.map((l) =>
+      l
+        .replace(/^#!name=.*/, '#!name=广告拦截 DNS 版（零解密）')
+        .replace(/^#!desc=.*/, '#!desc=仅 DNS 层拦截广告域名，不开 HTTPS 解密、不含脚本，零性能开销；要 App 内去开屏请改用 blockAds.srmodule')
+        .replace(/^#!raw-url=.*/, '#!raw-url=https://github.com/chaojiman/sr-rules/raw/main/adblock/blockAds-dns.srmodule'),
+    ),
+    '',
+    ...ruleSec,
+    '',
+  ].join('\n');
+}
+
+const dnsResult = buildDnsOnly(result);
+const dnsRuleCount = dnsResult.split('\n').filter((l) => l.trim() && !l.trim().startsWith('#') && !/^\[.+\]$/.test(l.trim())).length;
+
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 const prev = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : null;
-if (prev === result) {
+const prevDns = fs.existsSync(DNS_OUT) ? fs.readFileSync(DNS_OUT, 'utf8') : null;
+if (prev === result && prevDns === dnsResult) {
   console.log('无变化');
   process.exit(0);
 }
-fs.writeFileSync(OUT, result);
-console.log(`已写入 ${OUT}`);
+if (prev !== result) {
+  fs.writeFileSync(OUT, result);
+  console.log(`已写入 ${OUT}`);
+}
+if (prevDns !== dnsResult) {
+  fs.writeFileSync(DNS_OUT, dnsResult);
+  console.log(`已写入 ${DNS_OUT}（${dnsRuleCount} 条 REJECT，无 MITM/脚本）`);
+}
