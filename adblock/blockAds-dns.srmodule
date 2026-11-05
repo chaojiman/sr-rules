@@ -17,16 +17,6 @@
 
 [Rule]
 # > QUIC 拦截（sr-rules 追加：直连 App 回退 TCP，MITM 才能生效）
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,amemv.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,snssdk.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,taobao.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,goofish.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,zhihu.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,pinduoduo.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,yangkeduo.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,bilibili.com)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,biliapi.net)),REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,hongyibo.com.cn)),REJECT
 
 # >>>>>>>>>>>>>>> ✅ !! ✅ <<<<<<<<<<<<<<
 # > 广告联盟
@@ -1665,7 +1655,6 @@ AND,((DOMAIN-KEYWORD,api),(DOMAIN-KEYWORD,-log-),(DOMAIN-SUFFIX,pangle.io)),REJE
 AND,((DOMAIN-KEYWORD,api),(DOMAIN-KEYWORD,-dual-event-),(DOMAIN-SUFFIX,pangle.io)),REJECT
 AND,((DOMAIN-KEYWORD,api),(DOMAIN-KEYWORD,pangolin),(DOMAIN-SUFFIX,sgsnssdk.com)),REJECT
 AND,((DOMAIN-KEYWORD,ads),(DOMAIN-KEYWORD,-normal-lq),(DOMAIN-SUFFIX,zijieapi.com)),REJECT
-URL-REGEX,"^http:\/\/p\d+-be-pack-sign\.pglstatp-toutiao\.com\/(ad-app-package|web\.business\.image)\/",REJECT
 DOMAIN,mon.zijieapi.com,REJECT
 DOMAIN,lf-ad-ies.bytecdn.cn,REJECT
 #DOMAIN,is.snssdk.com,REJECT
@@ -1951,19 +1940,6 @@ DOMAIN-SUFFIX,yx.lenovomm.com,REJECT
 
 # > Line
 # hostname = a.line.me, ad.line-scdn.net, w.line.me, gw.line.naver.jp, lan.line.me, buy.line.me, crs-event.line.me, obs.line-scdn.net, d.line-scdn.net, scdn.line-apps.com, sch.line.me, static.line-scdn.net, nelo2-col.linecorp.com, uts-front.line-apps.com, cix.line-apps.com, legy.line-apps.com, ec-bot-obs.line-scdn.net
-URL-REGEX,"^https:\/\/a\.line\.me\/lass\/api\/v\d\/ads$",REJECT-DROP
-URL-REGEX,"^https:\/\/a\.line\.me\/oa\/v\d\/e$",REJECT-DROP
-URL-REGEX,"^https:\/\/a\.line\.me\/cs\/v\d\/oa$",REJECT-DROP
-URL-REGEX,"^https:\/\/w\.line\.me\/adp\/api\/ad\/v\d\/",REJECT-DROP
-URL-REGEX,"^https:\/\/crs-event\.line\.me\/v\d\/imp",REJECT-DROP
-URL-REGEX,"^https:\/\/obs\.line-scdn\.net\/0h.+\/(o|m)\d+x\d+$",REJECT-DROP
-URL-REGEX,"^https:\/\/obs\.line-scdn\.net\/0hGH\d",REJECT-DROP
-URL-REGEX,"^https:\/\/obs\.line-scdn\.net\/0h.+\/\d+p\.mp4$",REJECT-DROP
-URL-REGEX,"^https:\/\/scdn\.line-apps\.com\/lan\/image\/line\/bannerImageEvent\/",REJECT-DROP
-URL-REGEX,"^https:\/\/scdn\.line-apps\.com\/lan\/document\/pageEvent\/line\/ios\/",REJECT-DROP
-URL-REGEX,"^https:\/\/sch\.line\.me\/api\/v\d\/ads$",REJECT-DROP
-URL-REGEX,"^https:\/\/uts-front\.line-apps\.com\/event$",REJECT-DROP
-URL-REGEX,"^https:\/\/uts-front\.line-apps\.com\/settings$",REJECT-DROP
 
 # > LinkedIn
 DOMAIN-SUFFIX,ads.linkedin.com,REJECT
@@ -2359,7 +2335,6 @@ AND,((DOMAIN-KEYWORD,api),(DOMAIN-KEYWORD,-log-),(DOMAIN-SUFFIX,pangle.io)),REJE
 AND,((DOMAIN-KEYWORD,api),(DOMAIN-KEYWORD,-dual-event-),(DOMAIN-SUFFIX,pangle.io)),REJECT
 AND,((DOMAIN-KEYWORD,api),(DOMAIN-KEYWORD,pangolin),(DOMAIN-SUFFIX,sgsnssdk.com)),REJECT
 AND,((DOMAIN-KEYWORD,ads),(DOMAIN-KEYWORD,-normal-lq),(DOMAIN-SUFFIX,zijieapi.com)),REJECT
-URL-REGEX,"^http:\/\/p\d+-be-pack-sign\.pglstatp-toutiao\.com\/(ad-app-package|web\.business\.image)\/",REJECT
 DOMAIN,mon.zijieapi.com,REJECT
 #DOMAIN, is.snssdk.com, REJECT
 DOMAIN,bds.snssdk.com,REJECT
@@ -3177,7 +3152,6 @@ DOMAIN,ads-img-al.xhscdn.com, REJECT
 DOMAIN,ads-video-al.xhscdn.com,REJECT
 DOMAIN,ads-video-qc.xhscdn.com,REJECT
 DOMAIN,t-ads.xiaohongshu.com,REJECT
-AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,xiaohongshu.com)),REJECT
 
 # > 小利生活
 # hostname = mpos-pic.helipay.com

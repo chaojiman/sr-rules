@@ -293,7 +293,12 @@ function buildDnsOnly(full) {
   const s = fl.findIndex((l) => l.trim() === '[Rule]');
   if (s < 0) throw new Error('未找到 [Rule] 段，无法生成零解密版');
   const e = fl.findIndex((l, i) => i > s && /^\[.+\]$/.test(l.trim()));
-  const ruleSec = fl.slice(s, e < 0 ? fl.length : e);
+  // 零解密版里，靠解密才能生效的规则全是负担，一并剔除：
+  //  - AND,((PROTOCOL,QUIC),...) 原本是「迫使走 TCP 才能 MITM」，没有 MITM 就只剩降速
+  //  - URL-REGEX 匹配的是完整 URL，HTTPS 不解密就看不到 path，永远不命中
+  const ruleSec = fl
+    .slice(s, e < 0 ? fl.length : e)
+    .filter((l) => !/^AND,\(\(PROTOCOL,QUIC\)/i.test(l.trim()) && !/^URL-REGEX,/i.test(l.trim()));
   return [
     ...header.map((l) =>
       l

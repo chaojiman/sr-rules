@@ -153,22 +153,38 @@ console.log(`\n${files} 个文件 / 合计 ${total} 行 → ${OUT}`);
 // ═══════════════════════════════════════════════════════
 // 上游给的是 RULE-SET（53,068 条 DOMAIN-SUFFIX，逐条规则匹配）。转成纯域名
 // DOMAIN-SET 后，客户端按域名集合查，解析和内存开销都显著下降。
+// 金融域名：永不进入去广告表（与 build-adblock.mjs 的 FIN_HOST 同一原则）
+// 上游广告库里偶尔会混进银行自己的埋点/营销域名（如 log.cmbchina.com），拦了不影响功能
+// 但违背「金融不碰」的约定，统一剔除。
+const ADLITE_FIN =
+  /(^|\.)(cmbchina\.com|icbc\.com\.cn|ccb\.com|abchina\.com(\.cn)?|psbc\.com|boc\.cn|bankofchina\.com|bankcomm\.com(\.cn)?|spdb\.com\.cn|citicbank\.com|cmbc\.com\.cn|hxb\.com\.cn|cebbank\.com|cgbchina\.com\.cn|cib\.com\.cn|95516\.com|unionpay\.com|unionpaysecure\.com|cup\.com\.cn|alipay\.com|tenpay\.com)$/i;
+
 if (want('adlite')) {
   try {
     const txt = await get('https://yfamilys.com/rule/ADLite.list');
     const set = new Set();
     let ipDropped = 0;
     let otherDropped = 0;
+    const finDropped = [];
     for (const raw of txt.split('\n')) {
       const l = raw.trim();
       if (!l || l.startsWith('#')) continue;
       let m;
       if ((m = l.match(/^DOMAIN-SUFFIX,(.+)$/i))) {
         const d = m[1].trim();
+        if (ADLITE_FIN.test(d)) {
+          finDropped.push(d);
+          continue;
+        }
         set.add(d);
         set.add('.' + d);
       } else if ((m = l.match(/^DOMAIN,(.+)$/i))) {
-        set.add(m[1].trim());
+        const d = m[1].trim();
+        if (ADLITE_FIN.test(d)) {
+          finDropped.push(d);
+          continue;
+        }
+        set.add(d);
       } else if (/^IP-CIDR6?,/i.test(l)) {
         ipDropped++;
       } else {
@@ -181,7 +197,8 @@ if (want('adlite')) {
     files++;
     console.log(
       `adlite     ← ADLite.list 转换        ${String(lines.length).padStart(6)} 行` +
-        `  (丢弃 IP-CIDR×${ipDropped} 其他×${otherDropped}，均与 GEOIP/其他集重叠)`,
+        `  (丢弃 IP-CIDR×${ipDropped} 其他×${otherDropped}` +
+        `${finDropped.length ? ` 金融×${finDropped.length}：${finDropped.join(', ')}` : ''}）`,
     );
   } catch (err) {
     console.log(`⚠️  ADLite 拉取失败，沿用现有 adlite.list：${err.message}`);
