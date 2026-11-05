@@ -65,13 +65,13 @@ flowchart TD
     A([发起请求]) --> B["DNS 解析<br/>阿里 / 腾讯 DoH<br/><b>全局只有一个 DNS</b>"]
     B --> C{"域名规则匹配<br/>从上往下，命中即停"}
 
-    C -->|"① 广告规则<br/>ADLite + ads.list"| R1[REJECT]
+    C -->|"① 广告规则<br/>adlite + ads.list"| R1[REJECT]
     C -->|"② 服务规则<br/>AI / GitHub / YouTube…"| R2[对应分组出口]
     C -->|"③ 国内域名<br/>.cn / china.list / cn-direct"| R3[DIRECT]
     C -->|"④ 未命中 ↓"| D{"global.list<br/>境外已知域名"}
 
     D -->|命中| P1[漏网之鱼]
-    D -->|"未命中 ↓"| E["IP 规则<br/>cn-ip / private-ip / GEOIP,CN"]
+    D -->|"未命中 ↓"| E["IP 规则<br/>private-ip / GEOIP,CN"]
     E -->|"这里必须真实解析<br/>可能拿到污染 IP"| F[按 IP 归属判断]
     F --> G[FINAL → 漏网之鱼]
 
@@ -135,7 +135,7 @@ flowchart TD
 ### 规则顺序（47 条）
 
 ```
-1    广告拦截      ADLite + ads.list
+1    广告拦截      adlite + ads.list
 1.5  显式优先      snssdk 直连、muse.ai、okx
 2    GitHub → AI   github → ai → OpenAI → Gemini
 3    流媒体        Netflix → Disney+ → Max → YouTube → Spotify
@@ -144,7 +144,7 @@ flowchart TD
 6    开发云        OneDrive → 微软 → 谷歌 → 苹果
 7    游戏          Steam → SteamCN → Epic → Nintendo → Sony → Game
 8    国内直连      .cn → bilibili → douyin → cn-direct
-9    兜底          china → private → global(境外) → cn-ip → private-ip
+9    兜底          china → private → global(境外) → private-ip
                    → GEOIP,CN → FINAL(漏网之鱼)
 ```
 
@@ -180,7 +180,7 @@ flowchart TD
 
 | 层 | 手段 | 风险 | 拦什么 |
 | --- | --- | --- | --- |
-| 1 | DNS 规则（ADLite 5 万条 + ads.list） | 零 | 独立广告域名、广告 SDK |
+| 1 | DNS 规则（adlite 5.3 万域名 + ads.list 2.6 千条） | 零 | 独立广告域名、广告 SDK |
 | 2 | MITM 模块 | 低 | App 内信息流、开屏、弹窗 |
 
 ### 两个模块，二选一
@@ -372,6 +372,8 @@ A：不能。去广告模块依赖 MITM，而 MITM 需要代理接管流量。
 | geosite `+.example.com` | `example.com` + `.example.com` 两行 | DOMAIN-SET 不认 `+.` 前缀 |
 | geoip `1.0.1.0/24` | `IP-CIDR,1.0.1.0/24` | **不加** `no-resolve`：加了 IP 规则对域名请求直接跳过，兜底失效 |
 | 第三方规则集 `USER-AGENT` / `IP-ASN` | 丢弃 | 小火箭规则集不支持，混入会导致整条加载失败 |
+| `ADLite.list`（RULE-SET 5.3 万条 `DOMAIN-SUFFIX`） | 本地 `adlite.list`（DOMAIN-SET 10.6 万行） | 域名集合查表比逐条规则匹配快；128 条 IP-CIDR 与 `GEOIP,CN` 重叠，丢弃 |
+| 被前序规则遮蔽的域名 | 构建时剔除 | 小火箭命中即停，这些条目永远不会生效（实测占 35.7%），白占内存 |
 
 ---
 

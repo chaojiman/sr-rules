@@ -43,8 +43,8 @@ const GEOSITE = {
 };
 
 // 输出文件名 → bett-rules geoip 分类名
+// 注：cn-ip 已停用 —— 与配置末尾的 GEOIP,CN 是同一份数据，只保留后者
 const GEOIP = {
-  'cn-ip': 'cn',
   'private-ip': 'private',
 };
 
@@ -147,3 +147,242 @@ for (const [out, paths] of Object.entries(MERGE)) {
 }
 
 console.log(`\n${files} 个文件 / 合计 ${total} 行 → ${OUT}`);
+
+// ═══════════════════════════════════════════════════════
+// ADLite：外部规则集转成本地 DOMAIN-SET
+// ═══════════════════════════════════════════════════════
+// 上游给的是 RULE-SET（53,068 条 DOMAIN-SUFFIX，逐条规则匹配）。转成纯域名
+// DOMAIN-SET 后，客户端按域名集合查，解析和内存开销都显著下降。
+if (want('adlite')) {
+  try {
+    const txt = await get('https://yfamilys.com/rule/ADLite.list');
+    const set = new Set();
+    let ipDropped = 0;
+    let otherDropped = 0;
+    for (const raw of txt.split('\n')) {
+      const l = raw.trim();
+      if (!l || l.startsWith('#')) continue;
+      let m;
+      if ((m = l.match(/^DOMAIN-SUFFIX,(.+)$/i))) {
+        const d = m[1].trim();
+        set.add(d);
+        set.add('.' + d);
+      } else if ((m = l.match(/^DOMAIN,(.+)$/i))) {
+        set.add(m[1].trim());
+      } else if (/^IP-CIDR6?,/i.test(l)) {
+        ipDropped++;
+      } else {
+        otherDropped++;
+      }
+    }
+    const lines = [...set];
+    fs.writeFileSync(path.join(OUT, 'adlite.list'), lines.join('\n') + '\n');
+    total += lines.length;
+    files++;
+    console.log(
+      `adlite     ← ADLite.list 转换        ${String(lines.length).padStart(6)} 行` +
+        `  (丢弃 IP-CIDR×${ipDropped} 其他×${otherDropped}，均与 GEOIP/其他集重叠)`,
+    );
+  } catch (err) {
+    console.log(`⚠️  ADLite 拉取失败，沿用现有 adlite.list：${err.message}`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// 影子规则裁剪
+// ═══════════════════════════════════════════════════════
+// 小火箭的规则是「从上往下，命中即停」。因此某条规则集里的域名，如果已经被
+// 配置里更早的规则命中，它就永远不会生效 —— 白占内存和加载时间。
+// 实测全量 149,487 条域名里有 53,338 条（35.7%）属于这种情况。
+// 这里按 config.conf 的真实顺序模拟一遍匹配，把这些死条目剔掉。
+// 只裁域名条目（纯域名 / DOMAIN / DOMAIN-SUFFIX），IP-CIDR、AND 等一律保留。
+const SELF_PREFIX = 'https://raw.githubusercontent.com/chaojiman/sr-rules/main/shadowrocket/rules/';
+
+function classifyRuleLine(l) {
+  let m;
+  // 规则集文件里的 DOMAIN* 行不带策略；万一带了（第三个字段）也只取域名
+  if ((m = l.match(/^DOMAIN-SUFFIX,([^,]+)/i))) return { kind: 's', d: m[1].trim() };
+  if ((m = l.match(/^DOMAIN,([^,]+)/i))) return { kind: 'e', d: m[1].trim() };
+  if ((m = l.match(/^DOMAIN-KEYWORD,([^,]+)/i))) return { kind: 'k', d: m[1].trim() };
+  if (l.startsWith('.')) return { kind: 's', d: l.slice(1) };
+  if (/^[a-z0-9*_-]+(\.[a-z0-9*_-]+)+$/i.test(l)) return { kind: 'e', d: l };
+  return null;
+}
+
+function makeMatcher() {
+  const exact = new Set();
+  const suffix = new Set();
+  const kws = [];
+  return {
+    add(c) {
+      if (c.kind === 's') suffix.add(c.d);
+      else if (c.kind === 'e') exact.add(c.d);
+      else kws.push(c.d);
+    },
+    hit(d) {
+      if (exact.has(d)) return true;
+      const parts = d.split('.');
+      for (let i = 0; i < parts.length; i++) if (suffix.has(parts.slice(i).join('.'))) return true;
+      return kws.some((k) => d.includes(k));
+    },
+  };
+}
+
+function entryMatches(item, d) {
+  if (item.type === 'inline') {
+    const c = item.c;
+    if (c.kind === 'e') return d === c.d;
+    if (c.kind === 's') return d === c.d || d.endsWith('.' + c.d);
+    return d.includes(c.d);
+  }
+  return item.matchSet.hit(d);
+}
+
+async function pruneShadowed() {
+  const conf = fs.readFileSync(path.resolve('shadowrocket/config.conf'), 'utf8').split('\n');
+  const s = conf.findIndex((l) => l.trim() === '[Rule]');
+  const e = conf.findIndex((l, i) => i > s && /^\[.+\]$/.test(l.trim()));
+  const entries = conf.slice(s + 1, e).filter((l) => l.trim() && !l.trim().startsWith('#'));
+
+  // ① 按配置顺序载入每个条目
+  const model = [];
+  for (const line of entries) {
+    const p = line.split(',').map((x) => x.trim());
+    const type = p[0];
+    const policy = p[p.length - 1];
+    if (type === 'DOMAIN' || type === 'DOMAIN-SUFFIX' || type === 'DOMAIN-KEYWORD') {
+      // 注意：不能用 classifyRuleLine(line) —— 它会把策略字段一起吞进域名（cn,DIRECT）
+      const kind = type === 'DOMAIN' ? 'e' : type === 'DOMAIN-SUFFIX' ? 's' : 'k';
+      model.push({ type: 'inline', c: { kind, d: p[1] }, policy });
+      continue;
+    }
+    if (type !== 'RULE-SET' && type !== 'DOMAIN-SET') continue;
+    const url = p[1];
+    const localName = url.startsWith(SELF_PREFIX) ? url.slice(SELF_PREFIX.length) : null;
+    const localPath = localName ? path.join(OUT, localName) : null;
+    let text;
+    if (localPath) {
+      if (!fs.existsSync(localPath)) continue;
+      text = fs.readFileSync(localPath, 'utf8');
+    } else {
+      try {
+        text = await get(url);
+      } catch (err) {
+        console.log(`⚠️  裁剪跳过 ${url.split('/').pop()}：${err.message}`);
+        continue;
+      }
+    }
+    const lines = text.split('\n');
+    const matchSet = makeMatcher();
+    for (const raw of lines) {
+      const t = raw.trim();
+      if (!t || t.startsWith('#')) continue;
+      const c = classifyRuleLine(t);
+      if (c) matchSet.add(c);
+    }
+    model.push({ type: 'set', name: localName || url.split('/').pop(), localPath, lines, matchSet, policy });
+  }
+
+  // ② 裁剪：维护一个「已经命中过什么」的全局匹配器
+  const gm = makeMatcher();
+  const report = [];
+  for (const item of model) {
+    if (item.type === 'inline') {
+      gm.add(item.c);
+      continue;
+    }
+    const keepLines = [];
+    let removed = 0;
+    let kept = 0;
+    const survivors = [];
+    for (const raw of item.lines) {
+      const t = raw.trim();
+      if (!t || t.startsWith('#')) {
+        keepLines.push(raw);
+        continue;
+      }
+      const c = classifyRuleLine(t);
+      if (!c) {
+        keepLines.push(raw);
+        continue;
+      }
+      if (gm.hit(c.d)) {
+        removed++;
+        continue;
+      }
+      keepLines.push(raw);
+      kept++;
+      survivors.push(c);
+    }
+    for (const c of survivors) gm.add(c);
+    item.keepLines = keepLines;
+    item.removed = removed;
+    item.kept = kept;
+    if (removed) report.push({ name: item.name, removed, kept, local: !!item.localPath });
+  }
+
+  // ③ 校验：抽样域名在「裁剪前 / 裁剪后」必须命中同一个策略
+  const allDomains = [];
+  for (const item of model) {
+    if (item.type !== 'set') continue;
+    for (const raw of item.lines) {
+      const t = raw.trim();
+      if (!t || t.startsWith('#')) continue;
+      const c = classifyRuleLine(t);
+      if (c) allDomains.push(c.d);
+    }
+  }
+  const step = Math.max(1, Math.floor(allDomains.length / 3000));
+  const sample = allDomains.filter((_, i) => i % step === 0);
+
+  const judge = (items, d) => {
+    for (const item of items) if (entryMatches(item, d)) return item.policy;
+    return 'FINAL';
+  };
+
+  const prunedModel = model.map((item) => {
+    if (item.type !== 'set') return item;
+    const matchSet = makeMatcher();
+    for (const raw of item.keepLines) {
+      const t = raw.trim();
+      if (!t || t.startsWith('#')) continue;
+      const c = classifyRuleLine(t);
+      if (c) matchSet.add(c);
+    }
+    return { ...item, matchSet };
+  });
+
+  const mismatch = [];
+  for (const d of sample) {
+    const a = judge(model, d);
+    const b = judge(prunedModel, d);
+    if (a !== b) mismatch.push(`${d}: ${a} → ${b}`);
+  }
+  if (mismatch.length) {
+    console.error(`❌ 影子裁剪校验失败（${mismatch.length}/${sample.length}）：\n  ${mismatch.slice(0, 10).join('\n  ')}`);
+    process.exit(1);
+  }
+
+  // ④ 写回
+  let totalRemoved = 0;
+  for (const item of model) {
+    if (item.type !== 'set' || !item.localPath || !item.removed) continue;
+    fs.writeFileSync(item.localPath, item.keepLines.join('\n'));
+    totalRemoved += item.removed;
+  }
+
+  console.log(`\n影子裁剪：剔除 ${totalRemoved} 条永远不可能命中的域名（抽样 ${sample.length} 个域名校验，策略 100% 一致）`);
+  for (const r of report.filter((x) => x.local).sort((a, b) => b.removed - a.removed)) {
+    console.log(`  ${r.name.padEnd(20)} -${String(r.removed).padStart(6)}  剩 ${r.kept}`);
+  }
+  const remote = report.filter((x) => !x.local);
+  if (remote.length) {
+    console.log(`  （另有 ${remote.length} 个外部规则集含重复条目，无权修改：${remote.map((r) => r.name.replace(/\.list$/, '')).join('、')}）`);
+  }
+}
+
+if (only.length === 0) {
+  await pruneShadowed();
+} else {
+  console.log('\n（部分构建模式，跳过影子裁剪 —— 裁剪需要全部规则集齐全）');
+}
