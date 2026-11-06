@@ -191,6 +191,18 @@ if (result && options) {
   }
   check(rules.includes('RULE-SET,emos,直连'), 'Bettbox Emby 附加规则源必须直接归入直连');
   check(options.生成高低倍率组 === false, 'Bettbox 高低倍率组必须关闭（防止上游字段漂移）');
+  check(options.生成地区自动选择组 === true, 'Bettbox 地区自动选择组必须开启');
+  check(options.生成家宽节点组 === false, 'Bettbox 家宽节点组必须关闭');
+  check(options.屏蔽代理QUIC流量 === true, 'Bettbox 屏蔽代理 QUIC 必须开启');
+  check(options.过滤非地区节点 === true, 'Bettbox 过滤非地区节点必须开启');
+  check(options.代理IPV4优先 === true, 'Bettbox 代理 IPv4 优先必须开启');
+
+  const autoGroups = groups.filter((group) => group.type === 'url-test' && group.name.endsWith('-自动选择'));
+  check(autoGroups.length > 0, 'Bettbox 开启地区自动选择后应生成 -自动选择 测速组');
+  for (const auto of autoGroups) {
+    const manual = groupsByName.get(auto.name.replace(/-自动选择$/, ''));
+    check(manual?.proxies?.includes(auto.name), `Bettbox 地区组 ${manual?.name || '?'} 应包含 ${auto.name}`);
+  }
 
   const expectedDefaults = {
     YouTube: '默认代理',

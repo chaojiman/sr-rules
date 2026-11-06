@@ -175,13 +175,22 @@ Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
   { name: 'PayPal=关', required: false, from: /^(\s*)PayPal:\s*true,/m, to: '$1PayPal: false,' },
   { name: 'Patreon=关', required: false, from: /^(\s*)Patreon:\s*true,/m, to: '$1Patreon: false,' },
   { name: 'EHentai=关', required: false, from: /^(\s*)EHentai:\s*true,/m, to: '$1EHentai: false,' },
+  // 地区组附带「-自动选择」（url-test），同地区内自动挑最快节点
   {
-    name: '地区自动组=关',
+    name: '地区自动组=开',
     required: false,
-    from: /^(\s*)生成地区自动选择组:\s*true,/m,
-    to: '$1生成地区自动选择组: false,',
+    from: /^(\s*)生成地区自动选择组:\s*(?:true|false),/m,
+    to: '$1生成地区自动选择组: true,',
   },
+  { name: '家宽组=关', required: false, from: /^(\s*)生成家宽节点组:\s*(?:true|false),/m, to: '$1生成家宽节点组: false,' },
   { name: '倍率组=关', required: false, from: /^(\s*)生成高低倍率组:\s*true,/m, to: '$1生成高低倍率组: false,' },
+  // 与小火箭的 block-quic = all-proxy 保持一致：非国内流量禁 QUIC，回退 TCP
+  {
+    name: '屏蔽代理QUIC=开',
+    required: false,
+    from: /^(\s*)屏蔽代理QUIC流量:\s*(?:true|false),/m,
+    to: '$1屏蔽代理QUIC流量: true,',
+  },
   { name: 'IPv4优先=开', required: false, from: /^(\s*)代理IPV4优先:\s*false,/m, to: '$1代理IPV4优先: true,' },
 
   // ── 服务默认出口：Bettbox 的「默认代理」对应小火箭的 PROXY ──
