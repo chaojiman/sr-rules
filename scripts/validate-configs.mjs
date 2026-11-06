@@ -295,7 +295,9 @@ if (result && options) {
   check(netflixGroup?.['default-selected'] === '默认代理', 'Bettbox Netflix 默认出口必须是默认代理');
   check(rules.includes('RULE-SET,netflix,Netflix'), 'Bettbox Netflix 规则必须归入 Netflix 组');
   check(rules.includes('RULE-SET,netflix_ip,Netflix'), 'Bettbox Netflix IP 规则必须归入 Netflix 组');
-  check(rules.includes('RULE-SET,emos,直连'), 'Bettbox Emby 附加规则源必须直接归入直连');
+  // Emby：按策略校验，不写死上游的附加规则源名（emos 已被上游删除）
+  check(rules.includes('RULE-SET,emby,直连'), 'Bettbox Emby 主规则源必须归入直连');
+  check(!rules.some((rule) => rule.endsWith(',Emby')), 'Bettbox 不应有规则指向已移除的 Emby 分组');
   check(options.生成高低倍率组 === false, 'Bettbox 高低倍率组必须关闭（防止上游字段漂移）');
   check(options.生成地区自动选择组 === true, 'Bettbox 地区自动选择组必须开启');
   check(options.生成家宽节点组 === false, 'Bettbox 家宽节点组必须关闭');
