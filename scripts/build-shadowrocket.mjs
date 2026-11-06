@@ -1,13 +1,16 @@
 /**
  * 把 appshubcc/bett-rules 的 .list（mihomo hosts 格式）转成小火箭可用格式
  *
- * geosite:  +.example.com  →  example.com / .example.com （两行，精确 + 后缀）
+ * geosite:  +.example.com  →  .example.com （DOMAIN-SET 里 .x 同时匹配 x 本身和全部子域）
  *           example.com    →  example.com
  * geoip:    1.0.1.0/24     →  IP-CIDR,1.0.1.0/24
- *           IPv6 段        →  IP-CIDR6,...,no-resolve
+ *           IPv6 段        →  IP-CIDR6,...
  *
- * 注意：IP 规则一律不加 no-resolve。
- *       加了 no-resolve 会让该规则对「域名请求」直接跳过，IP 兜底形同失效。
+ * no-resolve 规则：
+ *   - 合并类（MERGE）规则集里的 IP 规则一律加 no-resolve。它们排在 global.list 之前，
+ *     不加的话每个没命中前面规则的域名都要先做一次本地 DNS 解析（境外域名会被国内 DoH 污染）。
+ *     App 直接用 IP 连接时，no-resolve 的 IP 规则照样能命中。
+ *   - private-ip.list 不加：它紧挨着 GEOIP,CN，那里本来就要解析，加了反而让内网 IP 兜底失效。
  * 输出到 rules/，供小火箭 DOMAIN-SET / RULE-SET 直接引用
  * 用法: node build-rules.mjs
  */
@@ -23,11 +26,8 @@ const GEOSITE = {
   ads: 'category-ads',
   google: 'google',
   youtube: 'youtube',
-  netflix: 'netflix',
   telegram: 'telegram',
-  meta: 'meta',
   tiktok: 'tiktok',
-  spotify: 'spotify',
   github: 'github',
   microsoft: 'microsoft',
   apple: 'apple',
@@ -64,7 +64,23 @@ const MERGE = {
     'Shadowrocket/Sina/Sina.list',
     'Shadowrocket/DouBan/DouBan.list',
   ],
+  // 原来在 config.conf 里直接引用的 blackmatrix7 远程规则集，改为本仓库生成
+  'ai-extra': ['Shadowrocket/OpenAI/OpenAI.list', 'Shadowrocket/Gemini/Gemini.list'],
+  onedrive: ['Shadowrocket/OneDrive/OneDrive.list'],
+  games: [
+    'Shadowrocket/SteamCN/SteamCN.list',
+    'Shadowrocket/Epic/Epic.list',
+    'Shadowrocket/Nintendo/Nintendo.list',
+    'Shadowrocket/Sony/Sony.list',
+    'Shadowrocket/Game/Game.list',
+  ],
 };
+
+// DOMAIN-SET 去重：.x 已经覆盖 x 本身，精确行 x 是多余的
+function dedupeDomainSet(lines) {
+  const suffix = new Set(lines.filter((l) => l.startsWith('.')).map((l) => l.slice(1)));
+  return [...new Set(lines)].filter((l) => l.startsWith('.') || !suffix.has(l));
+}
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -87,17 +103,53 @@ for (const [out, src] of Object.entries(GEOSITE)) {
   for (const raw of txt.split('\n')) {
     const d = raw.trim();
     if (!d || d.startsWith('#')) continue;
-    if (d.startsWith('+.')) {
-      const s = d.slice(2);
-      lines.push(s, '.' + s);
-    } else {
-      lines.push(d);
-    }
+    if (d.startsWith('+.')) lines.push('.' + d.slice(2));
+    else lines.push(d);
   }
+  lines.splice(0, lines.length, ...dedupeDomainSet(lines));
   fs.writeFileSync(path.join(OUT, out + '.list'), lines.join('\n') + '\n');
   total += lines.length;
   files++;
   console.log(`${out.padEnd(10)} ← geosite/${src.padEnd(24)} ${String(lines.length).padStart(6)} 行`);
+}
+
+// ═══════════════════════════════════════════════════════
+// 去广告模块（DNS 版）并入配置
+// ═══════════════════════════════════════════════════════
+// 模块规则优先于配置规则，装了模块等于每个请求先过一遍它的 2,900 条规则，
+// 其中 108 条 DOMAIN-KEYWORD 要逐条做子串扫描。并入后不用再装模块：
+//   - 纯域名（含 100 条其实是完整域名的 KEYWORD）→ 并进 ads.list（DOMAIN-SET，哈希查找）
+//   - 真关键词 / IP / UA / AND 逻辑规则 → ads-extra.list（RULE-SET）
+// 读的是仓库里已提交的 blockAds-dns.srmodule（sync-adblock 在本流程之后跑，用前一天的版本）
+const DNS_MODULE = path.resolve('adblock/blockAds-dns.srmodule');
+if (want('ads') && fs.existsSync(DNS_MODULE)) {
+  const adsPath = path.join(OUT, 'ads.list');
+  const adsLines = fs.readFileSync(adsPath, 'utf8').split('\n').filter((l) => l.trim());
+  const extra = new Set();
+  let inRule = false;
+  let domains = 0;
+  for (const raw of fs.readFileSync(DNS_MODULE, 'utf8').split('\n')) {
+    const l = raw.trim();
+    if (/^\[.+\]$/.test(l)) { inRule = l === '[Rule]'; continue; }
+    if (!inRule || !l || l.startsWith('#')) continue;
+    const type = l.split(',')[0].toUpperCase();
+    const value = (l.split(',')[1] || '').trim();
+    const isDomain = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/i.test(value);
+    if (type === 'DOMAIN-SUFFIX' || (type === 'DOMAIN-KEYWORD' && isDomain)) {
+      adsLines.push('.' + value);
+      domains++;
+    } else if (type === 'DOMAIN') {
+      adsLines.push(value);
+      domains++;
+    } else {
+      // 去掉末尾策略，其余参数（no-resolve 等）保留
+      extra.add(l.replace(/,\s*REJECT(?=,no-resolve$|$)/i, ''));
+    }
+  }
+  const merged = dedupeDomainSet(adsLines);
+  fs.writeFileSync(adsPath, merged.join('\n') + '\n');
+  fs.writeFileSync(path.join(OUT, 'ads-extra.list'), [...extra].join('\n') + '\n');
+  console.log(`ads        ← 并入 DNS 版模块 ${domains} 个域名，合计 ${merged.length} 行；ads-extra ${extra.size} 条`);
 }
 
 for (const [out, src] of Object.entries(GEOIP)) {
@@ -127,12 +179,13 @@ for (const [out, paths] of Object.entries(MERGE)) {
       if (!l || l.startsWith('#')) continue;
       const type = (l.split(',')[0] || '').toUpperCase();
       // 只保留小火箭 RULE-SET 确定支持的类型
-      if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'IP-CIDR', 'IP-CIDR6'].includes(type)) {
+      if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN'].includes(type)) {
         dropped[type] = (dropped[type] || 0) + 1;
         continue;
       }
-      // 不加 no-resolve：加了会让 IP 规则对所有域名请求失效（源里自带的也剥掉）
+      // IP 规则统一加 no-resolve（见文件头说明）
       l = l.replace(/,no-resolve$/i, '');
+      if (type === 'IP-CIDR' || type === 'IP-CIDR6' || type === 'IP-ASN') l += ',no-resolve';
       set.add(l);
     }
   }
@@ -176,7 +229,6 @@ if (want('adlite')) {
           finDropped.push(d);
           continue;
         }
-        set.add(d);
         set.add('.' + d);
       } else if ((m = l.match(/^DOMAIN,(.+)$/i))) {
         const d = m[1].trim();
@@ -191,7 +243,7 @@ if (want('adlite')) {
         otherDropped++;
       }
     }
-    const lines = [...set];
+    const lines = dedupeDomainSet([...set]);
     fs.writeFileSync(path.join(OUT, 'adlite.list'), lines.join('\n') + '\n');
     total += lines.length;
     files++;

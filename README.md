@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | [小火箭配置](shadowrocket/config.conf) | iPhone | 分流 + 去广告 |
 | [Bettbox 脚本](bettbox/mihomoScript.js) | Windows | 分流 |
-| [去广告模块](adblock/blockAds.srmodule) | iPhone | App 内广告 |
+| [去广告模块](adblock/blockAds.srmodule) | iPhone | App 内开屏广告（可选，会变卡） |
 
 全部每天自动跟随上游更新，你不用管。
 
@@ -20,16 +20,11 @@
 第 1 步  下配置
         小火箭 → 配置 → 右上角 + → 粘贴上面的配置地址 → 下载
 
-第 2 步  装证书（去广告才需要，只要做一次）
-        配置后面的 ⓘ → HTTPS 解密 → 生成新的 CA 证书 → 安装
-        iOS 设置 → 已下载描述文件 → 安装
-        iOS 设置 → 通用 → 关于本机 → 证书信任设置 → 打开小火箭
-
-第 3 步  装去广告模块
-        小火箭 → 模块 → 右上角 + → 粘贴模块地址
-
-第 4 步  开代理
+第 2 步  开代理
         首页 → 打开开关
+
+去广告已内置在配置里（DNS 规则，零解密），不需要装证书和模块。
+只有想去掉 App 内开屏广告时，才需要装证书 + blockAds.srmodule，并把 [MITM] enable 改为 true。
 ```
 
 ### Windows（Bettbox）
@@ -47,7 +42,7 @@
 模块-DNS  https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds-dns.srmodule
 ```
 
-> 模块和模块-DNS **二选一**：前者带 MITM 去开屏（会变卡），后者零开销。详见下文「两个模块，二选一」。
+> 模块-DNS 的规则已并入配置（`ads.list` + `ads-extra.list`），**不用再装**。完整版模块仍可选装，见下文「两个模块」。
 
 > 大陆拉不动 raw.githubusercontent.com 时，把 `https://raw.githubusercontent.com/chaojiman/sr-rules/main/`
 > 换成 `https://cdn.jsdelivr.net/gh/chaojiman/sr-rules@main/`
@@ -132,17 +127,17 @@ flowchart TD
 
 ## 📱 小火箭
 
-### 规则顺序（47 条）
+### 规则顺序（36 条）
 
 ```
-1    广告拦截      adlite + ads.list
+1    广告拦截      adlite + ads + ads-extra（含原 DNS 版模块）
 1.5  显式优先      snssdk 直连、muse.ai、okx
-2    GitHub → AI   github → ai → OpenAI → Gemini
-3    流媒体        Netflix → Disney+ → Max → YouTube → Spotify
-4    社交          Telegram → Facebook → TikTok
-5    支付          PayPal → Amazon
+2    GitHub → AI   github → ai → ai-extra（OpenAI + Gemini）
+3    流媒体        YouTube
+4    社交          Telegram → TikTok
+5    支付          PayPal
 6    开发云        OneDrive → 微软 → 谷歌 → 苹果
-7    游戏          Steam → SteamCN → Epic → Nintendo → Sony → Game
+7    游戏          steam → games（SteamCN/Epic/Nintendo/Sony/Game 合并）
 8    国内直连      .cn → bilibili → douyin → cn-direct
 9    兜底          china → private → global(境外) → private-ip
                    → GEOIP,CN → FINAL(漏网之鱼)
@@ -165,10 +160,11 @@ flowchart TD
 
 | 分组 | 默认 | 分组 | 默认 |
 | --- | --- | --- | --- |
-| AI | 美国节点 | PayPal / Amazon | DIRECT |
+| AI | 美国节点 | PayPal | DIRECT |
 | YouTube | 香港节点 | 微软服务 | PROXY |
 | GitHub / 谷歌 / Telegram | PROXY | 苹果服务 | DIRECT |
-| 其余服务组 | PROXY | 游戏平台 / 哔哩哔哩 | DIRECT |
+| TikTok | PROXY | 游戏平台 / 哔哩哔哩 | DIRECT |
+| Netflix / Disney+ / Max / Spotify / Facebook / Amazon | 无独立分组，走漏网之鱼 | | |
 | 地区组（6 个） | 手动选择，不自动切换 | 漏网之鱼 | PROXY |
 | | | 广告拦截 | REJECT |
 
@@ -180,10 +176,10 @@ flowchart TD
 
 | 层 | 手段 | 风险 | 拦什么 |
 | --- | --- | --- | --- |
-| 1 | DNS 规则（adlite 5.3 万域名 + ads.list 2.6 千条） | 零 | 独立广告域名、广告 SDK |
+| 1 | DNS 规则（adlite 5.3 万域名 + ads.list 3.2 千条 + ads-extra 85 条） | 零 | 独立广告域名、广告 SDK |
 | 2 | MITM 模块 | 低 | App 内信息流、开屏、弹窗 |
 
-### 两个模块，二选一
+### 两个模块
 
 | 模块 | 内容 | 性能 | 能拦什么 |
 | --- | --- | --- | --- |
@@ -194,7 +190,7 @@ flowchart TD
 `edith.xiaohongshu.com`、`mp.weixin.qq.com` 这类日常高频站做解密 + `requires-body` 缓冲，
 是卡顿主因；`-dns` 版没有任何解密，体验和装模块前完全一致。
 
-> 两个模块**不要同时装**，规则会重复。
+> `-dns` 版的规则每天会并进配置，**不需要再装**；装了只会让每个请求多过一遍重复规则。
 
 **模块是裁剪过的**：上游 `fmz200/wool_scripts` 对 900+ 个域名开 HTTPS 解密，覆盖 700 款 App，范围越大越容易卡顿、误伤。本仓库每天自动裁剪：
 
