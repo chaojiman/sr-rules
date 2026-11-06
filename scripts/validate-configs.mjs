@@ -143,6 +143,73 @@ check(ipPrefixKeyword === 0, `仍有 ${ipPrefixKeyword} 条 IP 前缀型 DOMAIN-
 check(keywordCount <= 40, `DOMAIN-KEYWORD 过多（${keywordCount} 条），每请求都要逐条子串扫描`);
 check(mitmOnlyRules === 0, `ads-extra.list 仍有 ${mitmOnlyRules} 条依赖 MITM 的 USER-AGENT/URL-REGEX 规则`);
 
+// DOMAIN-SET 里不得有被更宽后缀罩住的条目（纯内存浪费）
+function countShadowedDomainSet(lines) {
+  const sfx = new Set(lines.filter((l) => l.startsWith('.')).map((l) => l.slice(1).toLowerCase()));
+  let shadowed = 0;
+  for (const line of lines) {
+    const isSuffix = line.startsWith('.');
+    const d = (isSuffix ? line.slice(1) : line).toLowerCase();
+    if (!isSuffix && sfx.has(d)) {
+      shadowed++;
+      continue;
+    }
+    const parts = d.split('.');
+    for (let i = 1; i < parts.length; i++) {
+      if (sfx.has(parts.slice(i).join('.'))) {
+        shadowed++;
+        break;
+      }
+    }
+  }
+  return shadowed;
+}
+
+for (const file of domainSetFiles) {
+  const lines = read(`shadowrocket/rules/${file}`)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const shadowed = countShadowedDomainSet(lines);
+  check(shadowed === 0, `${file} 仍有 ${shadowed} 条被更宽后缀遮蔽的域名`);
+}
+
+// 去广告 DNS 模块的产物卫生
+const dnsModulePath = 'adblock/blockAds-dns.srmodule';
+if (fs.existsSync(resolveInside(dnsModulePath))) {
+  const modRules = read(dnsModulePath)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#') && !/^\[.+\]$/.test(l));
+  const seenRule = new Set();
+  let dupRules = 0;
+  let deadRules = 0;
+  for (const line of modRules) {
+    if (seenRule.has(line)) dupRules++;
+    seenRule.add(line);
+    if (/\b(USER-AGENT|URL-REGEX)\b/i.test(line)) deadRules++;
+  }
+  const modDomains = modRules
+    .map((l) => l.match(/^(?:DOMAIN|DOMAIN-SUFFIX),([^,\s]+)/i)?.[1])
+    .filter(Boolean);
+  const modSfx = new Set(
+    modRules.map((l) => l.match(/^DOMAIN-SUFFIX,([^,\s]+)/i)?.[1].toLowerCase()).filter(Boolean),
+  );
+  let modShadowed = 0;
+  for (const d of modDomains) {
+    const parts = d.toLowerCase().split('.');
+    for (let i = 1; i < parts.length; i++) {
+      if (modSfx.has(parts.slice(i).join('.'))) {
+        modShadowed++;
+        break;
+      }
+    }
+  }
+  check(deadRules === 0, `DNS 模块仍有 ${deadRules} 条依赖 MITM 的 USER-AGENT/URL-REGEX 规则`);
+  check(dupRules === 0, `DNS 模块仍有 ${dupRules} 条完全重复的规则`);
+  check(modShadowed === 0, `DNS 模块仍有 ${modShadowed} 条被更宽后缀遮蔽的规则`);
+}
+
 // ── Bettbox：执行 main()，校验真实生成结果 ─────────────────
 const bettboxCode = read('bettbox/mihomoScript.js');
 const proxy = (name) => ({

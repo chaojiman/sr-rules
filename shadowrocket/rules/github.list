@@ -25,8 +25,6 @@ productionresultssa16.blob.core.windows.net
 productionresultssa17.blob.core.windows.net
 productionresultssa18.blob.core.windows.net
 productionresultssa19.blob.core.windows.net
-copilot-proxy.githubusercontent.com
-copilot-workspace.githubnext.com
 copilotprodattachments.blob.core.windows.net
 .atom.io
 .dependabot.com
@@ -59,7 +57,3 @@ copilotprodattachments.blob.core.windows.net
 .npm.community
 .npmjs.com
 .npmjs.org
-.cafe.github.com
-.collector.github.com
-copilot-telemetry-service.githubusercontent.com
-copilot-telemetry.githubusercontent.com

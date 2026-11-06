@@ -76,10 +76,24 @@ const MERGE = {
   ],
 };
 
-// DOMAIN-SET 去重：.x 已经覆盖 x 本身，精确行 x 是多余的
+// DOMAIN-SET 去重：
+//  1) .x 已经覆盖 x 本身，精确行 x 是多余的
+//  2) .x 也覆盖 .y.x 和 y.x，被更宽后缀罩住的条目同样多余
+// 都是纯内存优化：DOMAIN-SET 是集合查找，命中路径不变。
 function dedupeDomainSet(lines) {
-  const suffix = new Set(lines.filter((l) => l.startsWith('.')).map((l) => l.slice(1)));
-  return [...new Set(lines)].filter((l) => l.startsWith('.') || !suffix.has(l));
+  const uniq = [...new Set(lines)];
+  const suffixes = new Set(uniq.filter((l) => l.startsWith('.')).map((l) => l.slice(1).toLowerCase()));
+  const covered = (d) => {
+    const p = d.toLowerCase().split('.');
+    for (let i = 1; i < p.length; i++) if (suffixes.has(p.slice(i).join('.'))) return true;
+    return false;
+  };
+  return uniq.filter((l) => {
+    const isSuffix = l.startsWith('.');
+    const d = isSuffix ? l.slice(1) : l;
+    if (!isSuffix && suffixes.has(d.toLowerCase())) return false;
+    return !covered(d);
+  });
 }
 
 fs.mkdirSync(OUT, { recursive: true });

@@ -293,13 +293,54 @@ function buildDnsOnly(full) {
   const s = fl.findIndex((l) => l.trim() === '[Rule]');
   if (s < 0) throw new Error('未找到 [Rule] 段，无法生成零解密版');
   const e = fl.findIndex((l, i) => i > s && /^\[.+\]$/.test(l.trim()));
-  // 零解密版里，靠解密才能生效的规则全是负担，一并剔除：
+  const isStruct = (t) => !t || t.startsWith('#') || /^\[.+\]$/.test(t);
+  const raw = fl.slice(s, e < 0 ? fl.length : e);
+
+  // 1) 无 MITM 时永远不命中：
   //  - AND,((PROTOCOL,QUIC),...) 原本是「迫使走 TCP 才能 MITM」，没有 MITM 就只剩降速
-  //  - URL-REGEX 匹配的是完整 URL，HTTPS 不解密就看不到 path，永远不命中
-  const ruleSec = fl
-    .slice(s, e < 0 ? fl.length : e)
-    .filter((l) => !/^AND,\(\(PROTOCOL,QUIC\)/i.test(l.trim()) && !/^URL-REGEX,/i.test(l.trim()));
-  return [
+  //  - USER-AGENT / URL-REGEX 在 HTTPS 不解密时看不到 UA 和 path，包括嵌在 AND 里的
+  const alive = raw.filter((l) => {
+    const t = l.trim();
+    if (isStruct(t)) return true;
+    if (/^AND,\(\(PROTOCOL,QUIC\)/i.test(t)) return false;
+    if (/\b(USER-AGENT|URL-REGEX)\b/i.test(t)) return false;
+    return true;
+  });
+
+  // 2) 完全重复的规则行
+  const seen = new Set();
+  const deduped = alive.filter((l) => {
+    const t = l.trim();
+    if (isStruct(t)) return true;
+    if (seen.has(t)) return false;
+    seen.add(t);
+    return true;
+  });
+
+  // 3) 被同集合更宽 DOMAIN-SUFFIX 覆盖的条目。模块里全部是 REJECT，
+  //    剪掉不改变拦截结果，只少占内存。
+  const suffixes = new Set();
+  for (const l of deduped) {
+    const m = l.trim().match(/^DOMAIN-SUFFIX,([^,\s]+)/i);
+    if (m) suffixes.add(m[1].toLowerCase());
+  }
+  const covered = (d) => {
+    const p = d.toLowerCase().split('.');
+    for (let i = 1; i < p.length; i++) if (suffixes.has(p.slice(i).join('.'))) return true;
+    return false;
+  };
+  const ruleSec = deduped.filter((l) => {
+    const t = l.trim();
+    const m = t.match(/^(?:DOMAIN|DOMAIN-SUFFIX),([^,\s]+)/i);
+    return !m || !covered(m[1]);
+  });
+
+  const stats = {
+    dead: raw.length - alive.length,
+    dup: alive.length - deduped.length,
+    shadowed: deduped.length - ruleSec.length,
+  };
+  const text = [
     ...header.map((l) =>
       l
         .replace(/^#!name=.*/, '#!name=广告拦截 DNS 版（零解密）')
@@ -310,9 +351,10 @@ function buildDnsOnly(full) {
     ...ruleSec,
     '',
   ].join('\n');
+  return { text, stats };
 }
 
-const dnsResult = buildDnsOnly(result);
+const { text: dnsResult, stats: dnsStats } = buildDnsOnly(result);
 const dnsRuleCount = dnsResult.split('\n').filter((l) => l.trim() && !l.trim().startsWith('#') && !/^\[.+\]$/.test(l.trim())).length;
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -328,5 +370,8 @@ if (prev !== result) {
 }
 if (prevDns !== dnsResult) {
   fs.writeFileSync(DNS_OUT, dnsResult);
-  console.log(`已写入 ${DNS_OUT}（${dnsRuleCount} 条 REJECT，无 MITM/脚本）`);
+  console.log(
+    `已写入 ${DNS_OUT}（${dnsRuleCount} 条 REJECT，无 MITM/脚本；` +
+      `剔死规则 ${dnsStats.dead}、去重 ${dnsStats.dup}、剪遮蔽 ${dnsStats.shadowed}）`,
+  );
 }
