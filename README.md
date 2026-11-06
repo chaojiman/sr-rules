@@ -60,7 +60,7 @@ Bettbox  覆写 / 脚本 → 更新 → 重连（或重启内核）
 | --- | --- |
 | 默认出口 | YouTube / TikTok = 默认代理，AI = 美国，PayPal = 直连 |
 | 广告拦截 | 小火箭的「广告拦截」组为 `REJECT`；Bettbox 的 `AdBlock` 组为 `REJECT` |
-| 多余分组 | Bettbox 不应再出现 Line / Netflix / Emby / PikPak / Spotify / Crypto / PayPal / Patreon / EHentai |
+| 多余分组 | Bettbox 不应再出现 Line / Emby / PikPak / Spotify / Crypto / PayPal / Patreon / EHentai |
 
 > Bettbox 会记住你之前手动选过的出口，新默认值不一定能覆盖旧选择。上表对不上时手动点一下即可。
 > 从 URL 更新小火箭配置会重置为 `policy-select-name` 的默认值。
@@ -318,6 +318,7 @@ node scripts/check-adblock-risk.mjs
 | Telegram | 默认代理 | 同上 |
 | TikTok | 默认代理 | 同上 |
 | Meta | 默认代理 | 同上 |
+| Netflix | 默认代理 | 同上 |
 | Microsoft / Apple / Steam | 默认代理 | 同上 + 直连 |
 | AdBlock | REJECT | REJECT / REJECT-DROP / PASS |
 | 漏网之鱼 | 默认代理 | 默认代理 / 直连 / 各地区 |
@@ -326,7 +327,7 @@ node scripts/check-adblock-risk.mjs
 
 | 服务 | 规则是否保留 | 实际出口 |
 | --- | --- | --- |
-| Line / Netflix / PikPak / Spotify / Crypto / Patreon / EHentai | **不保留**，连规则源一起删除 | 由 `geolocation-!cn` 或 `MATCH` 兜底 → 默认代理 |
+| Line / PikPak / Spotify / Crypto / Patreon / EHentai | **不保留**，连规则源一起删除 | 由 `geolocation-!cn` 或 `MATCH` 兜底 → 默认代理 |
 | Emby / PayPal | **保留**，但规则直接指向 `直连` | 直连 |
 
 > 为什么默认代理的服务可以删规则：Bettbox 末尾是 `geolocation-!cn → 默认代理`、`MATCH → 漏网之鱼`（默认也是默认代理）。

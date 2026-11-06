@@ -166,7 +166,6 @@ if (result && options) {
 
   const disabledServiceProviders = {
     Line: ['line'],
-    Netflix: ['netflix', 'netflix_ip'],
     PikPak: ['pikpak'],
     Spotify: ['spotify', 'spotify_ip'],
     Crypto: ['cryptocurrency'],
@@ -189,6 +188,13 @@ if (result && options) {
   for (const [name, [provider, policy]] of Object.entries(inlineServices)) {
     check(rules.includes(`RULE-SET,${provider},${policy}`), `Bettbox ${name} 规则必须直接归入 ${policy}`);
   }
+  // Netflix 保留独立分组，可单独指定地区（流媒体常需按区切换）
+  check(options.Netflix === true, 'Bettbox Netflix 开关必须开启');
+  const netflixGroup = groupsByName.get('Netflix');
+  check(netflixGroup, 'Bettbox 应生成 Netflix 策略组');
+  check(netflixGroup?.['default-selected'] === '默认代理', 'Bettbox Netflix 默认出口必须是默认代理');
+  check(rules.includes('RULE-SET,netflix,Netflix'), 'Bettbox Netflix 规则必须归入 Netflix 组');
+  check(rules.includes('RULE-SET,netflix_ip,Netflix'), 'Bettbox Netflix IP 规则必须归入 Netflix 组');
   check(rules.includes('RULE-SET,emos,直连'), 'Bettbox Emby 附加规则源必须直接归入直连');
   check(options.生成高低倍率组 === false, 'Bettbox 高低倍率组必须关闭（防止上游字段漂移）');
   check(options.生成地区自动选择组 === true, 'Bettbox 地区自动选择组必须开启');

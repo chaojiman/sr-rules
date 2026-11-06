@@ -36,7 +36,7 @@ const ruleOptionsEnable = {
   Twitter: false, // Twitter社交平台
   Meta: true, // Meta服务
   Line: false, // Line通讯软件
-  Netflix: false, // Netflix视频平台
+  Netflix: true, // Netflix视频平台
   Emby: false, // Emby媒体服务
   PikPak: false, // PikPak网盘服务
   Spotify: false, // Spotify音乐服务
@@ -654,6 +654,7 @@ const serviceConfigs = [
   {
     name: 'Netflix',
     baseOption: selectBaseOption,
+    defaultSelected: '默认代理',
     providers: {
       netflix: {
         ...ruleProviderCommonDomain,
@@ -831,7 +832,6 @@ const INLINE_SERVICE_POLICIES = {
 };
 const NO_GROUP_SERVICES = new Set([
   'Line',
-  'Netflix',
   'Emby',
   'PikPak',
   'Spotify',
