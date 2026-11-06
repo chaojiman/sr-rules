@@ -75,18 +75,37 @@ const prefixRules = [
 ${extraBlock}`,
   },
 
-  // ── 必需：.cn 后缀兜底（geolocation-cn 是人工列表，覆盖不到企业/地方站点）──
+  // ── 必需：.cn 兜底放在 AdBlock/GitHub/AI 后、其余服务前 ──
+  // geolocation-cn 等国内基础直连仍留在 prefixRules，避免误伤推送等功能域。
   {
-    name: '.cn 后缀直连',
+    name: '.cn 后缀直连（广告/GitHub/AI 优先）',
     required: true,
-    from: `  'DOMAIN-SUFFIX,ctaiot.com,直连',
-];`,
-    to: `  'DOMAIN-SUFFIX,ctaiot.com,直连',
+    from: `  for (const svc of orderedServiceConfigs) {
+    if (!ruleOptionsEnable[svc.name]) continue;
 
-  // geolocation-cn 是人工维护的常用站点列表，覆盖不到企业/地方 .cn 站点
-  // 用后缀兜底，零 DNS 成本
-  'DOMAIN-SUFFIX,cn,直连',
-];`,
+    functionalRules.push(...(svc.rules || []));
+    functionalIpRules.push(...(svc.ipRules || []));
+    Object.assign(finalRuleProviders, svc.providers || {});
+  }`,
+    to: `  let cnFallbackInserted = false;
+  for (const svc of orderedServiceConfigs) {
+    // .cn 不能放在 prefixRules：否则会抢在 AdBlock 前放行 .cn 广告域名。
+    // 在首个非优先服务前插入，确保 AdBlock → GitHub → AI → .cn → 其余服务。
+    if (!['AdBlock', 'GitHub', 'AI'].includes(svc.name) && !cnFallbackInserted) {
+      functionalRules.push(
+        // geolocation-cn 覆盖不到企业/地方 .cn 站点；域名匹配无需 DNS 解析
+        'DOMAIN-SUFFIX,cn,直连',
+      );
+      cnFallbackInserted = true;
+    }
+    if (!ruleOptionsEnable[svc.name]) continue;
+
+    functionalRules.push(...(svc.rules || []));
+    functionalIpRules.push(...(svc.ipRules || []));
+    Object.assign(finalRuleProviders, svc.providers || {});
+  }
+  // 极端情况下上游只剩优先服务，也不能丢失 .cn 兜底。
+  if (!cnFallbackInserted) functionalRules.push('DOMAIN-SUFFIX,cn,直连');`,
   },
 
   // 注：上游 cn_ip / private_ip 本来就不带 no-resolve，无需补丁。
@@ -98,14 +117,51 @@ ${extraBlock}`,
   { name: '负载均衡=关', required: false, from: /^(\s*)负载均衡:\s*true,/m, to: '$1负载均衡: false,' },
   { name: 'FCM=关', required: false, from: /^(\s*)FCM:\s*true,/m, to: '$1FCM: false,' },
   { name: 'Twitter=关', required: false, from: /^(\s*)Twitter:\s*true,/m, to: '$1Twitter: false,' },
+  { name: 'Line=关', required: false, from: /^(\s*)Line:\s*true,/m, to: '$1Line: false,' },
+  { name: 'Emby=关', required: false, from: /^(\s*)Emby:\s*true,/m, to: '$1Emby: false,' },
+  { name: 'PikPak=关', required: false, from: /^(\s*)PikPak:\s*true,/m, to: '$1PikPak: false,' },
+  { name: 'Patreon=关', required: false, from: /^(\s*)Patreon:\s*true,/m, to: '$1Patreon: false,' },
+  { name: 'EHentai=关', required: false, from: /^(\s*)EHentai:\s*true,/m, to: '$1EHentai: false,' },
   {
     name: '地区自动组=关',
     required: false,
     from: /^(\s*)生成地区自动选择组:\s*true,/m,
     to: '$1生成地区自动选择组: false,',
   },
-  { name: '倍率组=关', required: false, from: /^(\s*)生成倍率组:\s*true,/m, to: '$1生成倍率组: false,' },
+  { name: '倍率组=关', required: false, from: /^(\s*)生成高低倍率组:\s*true,/m, to: '$1生成高低倍率组: false,' },
   { name: 'IPv4优先=开', required: false, from: /^(\s*)代理IPV4优先:\s*false,/m, to: '$1代理IPV4优先: true,' },
+
+  // ── 服务默认出口：Bettbox 的「默认代理」对应小火箭的 PROXY ──
+  {
+    name: 'YouTube=默认代理',
+    required: false,
+    from: `    name: 'YouTube',
+    baseOption: selectBaseOption,`,
+    to: `    name: 'YouTube',
+    baseOption: selectBaseOption,
+    defaultSelected: '默认代理',`,
+  },
+  {
+    name: 'TikTok=默认代理',
+    required: false,
+    from: `    name: 'TikTok',
+    baseOption: selectBaseOption,
+    defaultSelected: '日本',`,
+    to: `    name: 'TikTok',
+    baseOption: selectBaseOption,
+    defaultSelected: '默认代理',`,
+  },
+  {
+    name: 'PayPal=直连',
+    required: false,
+    from: `    name: 'PayPal',
+    baseOption: selectBaseOption,
+    defaultSelected: '美国',`,
+    to: `    name: 'PayPal',
+    baseOption: selectBaseOption,
+    direct: true,
+    defaultSelected: '直连',`,
+  },
 ];
 
 // ── 执行 ─────────────────────────────────────────────────

@@ -35,22 +35,22 @@ const ruleOptionsEnable = {
   TikTok: true, // TikTok视频平台
   Twitter: false, // Twitter社交平台
   Meta: true, // Meta服务
-  Line: true, // Line通讯软件
+  Line: false, // Line通讯软件
   Netflix: true, // Netflix视频平台
-  Emby: true, // Emby媒体服务
-  PikPak: true, // PikPak网盘服务
+  Emby: false, // Emby媒体服务
+  PikPak: false, // PikPak网盘服务
   Spotify: true, // Spotify音乐服务
   Crypto: true, // 加密货币相关服务
   PayPal: true, // PayPal支付服务
-  Patreon: true, // Patreon创作者赞助平台
-  EHentai: true, // E-Hentai网站
+  Patreon: false, // Patreon创作者赞助平台
+  EHentai: false, // E-Hentai网站
   AdBlock: true, // 广告拦截
 
   // 以下为非分流策略配置
   极简国内外分流模式: false, // 是否启用极简国内外分流模式
   生成地区自动选择组: false, // 是否生成地区自动选择策略组
   隐藏地区手动选择组: false, // 是否隐藏地区手动选择策略组
-  生成高低倍率组: true, // 是否生成低倍率/高倍率策略组
+  生成高低倍率组: false, // 是否生成低倍率/高倍率策略组
   生成家宽节点组: true, // 是否生成家宽（住宅/原生 IP）节点策略组
   分流组添加所有节点: false, // 是否为分流策略组添加所有节点
   过滤低倍率节点: false, // 是否过滤低倍率节点
@@ -96,10 +96,6 @@ const prefixRules = [
   'DOMAIN,fsend.cn,直连',
   'DOMAIN,international-gfe.download.nvidia.com,直连',
   'DOMAIN-SUFFIX,ctaiot.com,直连',
-
-  // geolocation-cn 是人工维护的常用站点列表，覆盖不到企业/地方 .cn 站点
-  // 用后缀兜底，零 DNS 成本
-  'DOMAIN-SUFFIX,cn,直连',
 ];
 
 // 此处添加自定义节点，填入下方[]内（可选，留空则不生成“自建节点”策略组）
@@ -423,6 +419,7 @@ const serviceConfigs = [
   {
     name: 'YouTube',
     baseOption: selectBaseOption,
+    defaultSelected: '默认代理',
     providers: {
       youtube: {
         ...ruleProviderCommonDomain,
@@ -579,7 +576,7 @@ const serviceConfigs = [
   {
     name: 'TikTok',
     baseOption: selectBaseOption,
-    defaultSelected: '日本',
+    defaultSelected: '默认代理',
     providers: {
       tiktok: {
         ...ruleProviderCommonDomain,
@@ -764,7 +761,8 @@ const serviceConfigs = [
   {
     name: 'PayPal',
     baseOption: selectBaseOption,
-    defaultSelected: '美国',
+    direct: true,
+    defaultSelected: '直连',
     providers: {
       paypal: {
         ...ruleProviderCommonDomain,
@@ -1216,13 +1214,25 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
     ...serviceConfigs.filter((svc) => svc.name === 'AI'),
     ...serviceConfigs.filter((svc) => svc.name !== 'AdBlock' && svc.name !== 'GitHub' && svc.name !== 'AI'),
   ];
+  let cnFallbackInserted = false;
   for (const svc of orderedServiceConfigs) {
+    // .cn 不能放在 prefixRules：否则会抢在 AdBlock 前放行 .cn 广告域名。
+    // 在首个非优先服务前插入，确保 AdBlock → GitHub → AI → .cn → 其余服务。
+    if (!['AdBlock', 'GitHub', 'AI'].includes(svc.name) && !cnFallbackInserted) {
+      functionalRules.push(
+        // geolocation-cn 覆盖不到企业/地方 .cn 站点；域名匹配无需 DNS 解析
+        'DOMAIN-SUFFIX,cn,直连',
+      );
+      cnFallbackInserted = true;
+    }
     if (!ruleOptionsEnable[svc.name]) continue;
 
     functionalRules.push(...(svc.rules || []));
     functionalIpRules.push(...(svc.ipRules || []));
     Object.assign(finalRuleProviders, svc.providers || {});
   }
+  // 极端情况下上游只剩优先服务，也不能丢失 .cn 兜底。
+  if (!cnFallbackInserted) functionalRules.push('DOMAIN-SUFFIX,cn,直连');
 
   for (const svc of serviceConfigs) {
     if (!ruleOptionsEnable[svc.name]) continue;

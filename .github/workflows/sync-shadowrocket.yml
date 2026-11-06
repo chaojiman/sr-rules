@@ -9,6 +9,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/build-shadowrocket.mjs'
+      - 'scripts/validate-configs.mjs'
+      - 'shadowrocket/config.conf'
       - '.github/workflows/sync-shadowrocket.yml'
 
 permissions:
@@ -30,6 +32,9 @@ jobs:
 
       - name: 生成规则集
         run: node scripts/build-shadowrocket.mjs
+
+      - name: 校验配置与规则顺序
+        run: node scripts/validate-configs.mjs
 
       - name: 提交变更
         run: |

@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/build-bettbox.mjs'
+      - 'scripts/validate-configs.mjs'
       - 'bettbox/rules-extra.txt'
       - '.github/workflows/sync-bettbox.yml'
 
@@ -31,6 +32,9 @@ jobs:
 
       - name: 拉取上游并打补丁
         run: node scripts/build-bettbox.mjs
+
+      - name: 校验配置与规则顺序
+        run: node scripts/validate-configs.mjs
 
       - name: 提交变更
         run: |

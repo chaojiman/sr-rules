@@ -161,7 +161,7 @@ flowchart TD
 | 分组 | 默认 | 分组 | 默认 |
 | --- | --- | --- | --- |
 | AI | 美国节点 | PayPal | DIRECT |
-| YouTube | 香港节点 | 微软服务 | PROXY |
+| YouTube | PROXY（默认代理） | 微软服务 | PROXY |
 | GitHub / 谷歌 / Telegram | PROXY | 苹果服务 | DIRECT |
 | TikTok | PROXY | 游戏平台 / 哔哩哔哩 | DIRECT |
 | Netflix / Disney+ / Max / Spotify / Facebook / Amazon | 无独立分组，走漏网之鱼 | | |
@@ -268,11 +268,12 @@ node scripts/check-adblock-risk.mjs
 
 | 改动 | 内容 |
 | --- | --- |
-| 规则顺序 | `AdBlock → GitHub → AI → FCM → YouTube → Google → …` |
+| 规则顺序 | 国内基础直连 → `AdBlock → GitHub → AI → .cn → YouTube → Google → …` |
 | GitHub 提前 | Copilot 全系自然归 GitHub，不用逐条钉 |
 | AI 提前 | `antigravity` / `gemini` 的 `*.googleapis.com` 不被谷歌抢 |
-| `.cn` 兜底 | 补 `DOMAIN-SUFFIX,cn,直连`，覆盖企业站/地方站 |
-| 默认开关 | 基础三组 / FCM / Twitter / 地区自动组 / 倍率组关闭，IPv4 优先开启 |
+| `.cn` 兜底 | 放在 AdBlock / GitHub / AI 后，避免 `.cn` 广告域名被提前直连；覆盖企业站/地方站 |
+| 默认开关 | 基础三组 / FCM / Twitter / 地区自动组 / 倍率组关闭；Emby / PikPak / Patreon / EHentai / Line 关闭；IPv4 优先开启 |
+| 服务默认出口 | YouTube / TikTok = 默认代理，PayPal = 直连，AI = 美国（与小火箭一致） |
 
 ### 加临时规则
 
@@ -335,6 +336,7 @@ node scripts/build-shadowrocket.mjs          # 全量规则集
 node scripts/build-shadowrocket.mjs ai china # 指定分类
 node scripts/build-bettbox.mjs               # Bettbox 脚本
 node scripts/build-bettbox.mjs --check       # 只校验锚点
+node scripts/validate-configs.mjs             # 校验生成结果、规则顺序和引用
 node scripts/build-adblock.mjs               # 去广告模块
 node scripts/check-adblock-risk.mjs          # 扫描模块里的高危规则
 node scripts/audit-adblock.mjs               # 审计模块引用的外部脚本
@@ -367,7 +369,7 @@ A：不能。去广告模块依赖 MITM，而 MITM 需要代理接管流量。
 | --- | --- | --- |
 | geosite `+.example.com` | `example.com` + `.example.com` 两行 | DOMAIN-SET 不认 `+.` 前缀 |
 | geoip `1.0.1.0/24` | `IP-CIDR,1.0.1.0/24` | **不加** `no-resolve`：加了 IP 规则对域名请求直接跳过，兜底失效 |
-| 第三方规则集 `USER-AGENT` / `IP-ASN` | 丢弃 | 小火箭规则集不支持，混入会导致整条加载失败 |
+| 第三方规则集 `USER-AGENT` / `IP-ASN` | 当前保留；IP 类规则加 `no-resolve`，由校验脚本检查类型 | 当前生成文件已包含这两类规则；真机兼容性待逐项确认，不再宣称构建时一律丢弃 |
 | `ADLite.list`（RULE-SET 5.3 万条 `DOMAIN-SUFFIX`） | 本地 `adlite.list`（DOMAIN-SET 10.6 万行） | 域名集合查表比逐条规则匹配快；128 条 IP-CIDR 与 `GEOIP,CN` 重叠，丢弃 |
 | 被前序规则遮蔽的域名 | 构建时剔除 | 小火箭命中即停，这些条目永远不会生效（实测占 35.7%），白占内存 |
 
