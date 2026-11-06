@@ -207,7 +207,7 @@ flowchart TD
 
 | 模块 | 内容 | 性能 | 能拦什么 |
 | --- | --- | --- | --- |
-| [blockAds-dns.srmodule](adblock/blockAds-dns.srmodule) | 只有 `[Rule]` 段（2,950 条 REJECT），**无 MITM、无脚本** | **零开销**，等同于没装模块 | 独立广告域名、广告 SDK |
+| [blockAds-dns.srmodule](adblock/blockAds-dns.srmodule) | 只有 `[Rule]` 段（2,267 条 REJECT），**无 MITM、无脚本** | **零开销**，等同于没装模块 | 独立广告域名、广告 SDK |
 | [blockAds.srmodule](adblock/blockAds.srmodule) | `[Rule]` + MITM 191 域名 + 94 条脚本 + 209 条 Map Local | **有开销**：命中域名要解密 + 缓冲整个响应体 + 跑 JS | 上面全部 + App 内开屏 / 信息流 / 弹窗 |
 
 **iOS 上打开网页明显变卡时，换 `-dns` 版。** 实测：完整版对 `www.baidu.com`、`www.zhihu.com`、
@@ -260,15 +260,16 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 | 开关 | 当前 | 作用 | 回滚 |
 | --- | --- | --- | --- |
 | `block-quic` | `all-proxy`（强制 TCP） | 避免 UDP 转发质量差的节点拖慢视频 | 注释即允许 HTTP/3 |
-| `dns-server` | IP 版 DoH3 + DoH（`h3://223.5.5.5` + `https://1.12.12.12`） | 直填 IP 免引导，不往池里混明文 UDP；h3 比 `https://` 少一轮 TCP+TLS 握手 | 改回 `223.5.5.5, 119.29.29.29` |
+| `dns-server` | 2 DoH + 2 UDP（`doh.pub` / `alidns` / `223.5.5.5` / `119.29.29.29`） | 多服务器并行查询取最快；明文 UDP 通常先返回，DoH 作为加密备选（与 LOWERTOP 的 lazy_group.conf 同组合） | 只留加密：`h3://223.5.5.5/dns-query, https://1.12.12.12/dns-query` |
 | `ipv6` | `true` | 本地 IPv6 不稳定时，AAAA 有结果但连不上会拖慢首次连接 | 改 `false` 试一天 |
 
 > 一次只改一个。已测过的结论：
 > - **L1 允许 HTTP/3**：已回滚，未保留。
 > - **L2 DNS 只用明文 UDP**：有一点提升，保留为回退档。
-> - **L3 DNS 换 IP 版 DoH3 + DoH**：当前生效中。速度应与 L2 持平，换来加密。
+> - **L3 DNS 换 IP 版 DoH3 + DoH**：速度与 L2 持平，已改回 2 DoH + 2 UDP（取两者之长）。
+> - **`hijack-dns` 从 6 条精简到 2 条**：减少拦截判断。
 >
-> 注意：`block-quic = all-proxy` 只拦**代理流量**的 QUIC；DNS 走 h3 是直连，不受影响。
+> 注意：`block-quic = all-proxy` 只拦**代理流量**的 QUIC；DNS 是直连，不受影响。
 >
 > 改 `config.conf` 推上去只会触发校验与规则重建，**手机仍需手动点「更新」**。
 
