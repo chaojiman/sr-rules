@@ -253,11 +253,14 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 
 | 开关 | 当前 | 作用 | 回滚 |
 | --- | --- | --- | --- |
-| `block-quic` | 已注释（允许 HTTP/3） | 代理流量可走 QUIC，YouTube / Google 少一次 TCP 建连 | 取消注释即强制 TCP |
-| `dns-server` | 2 DoH + 2 UDP | 明文 UDP 通常先返回；`dns-direct-system = true` 已让直连域名走系统解析 | 改回原行 |
+| `block-quic` | `all-proxy`（强制 TCP） | 避免 UDP 转发质量差的节点拖慢视频 | 注释即允许 HTTP/3 |
+| `dns-server` | 仅明文 UDP（`223.5.5.5` / `119.29.29.29`） | 去掉 DoH 的 TCP+TLS 握手；`dns-direct-system = true` 仍让直连域名走系统解析 | 改回「2 DoH + 2 UDP」 |
 | `ipv6` | `true` | 本地 IPv6 不稳定时，AAAA 有结果但连不上会拖慢首次连接 | 改 `false` 试一天 |
 
-> 建议顺序：先 `block-quic`，再考虑 DNS，最后 `ipv6`。
+> 一次只改一个。已测过的结论：
+> - **L1 允许 HTTP/3**：已回滚，未保留。
+> - **L2 DNS 只用明文 UDP**：当前生效中。
+>
 > 改 `config.conf` 推上去只会触发校验与规则重建，**手机仍需手动点「更新」**。
 
 ### 主 API 风险与检测
