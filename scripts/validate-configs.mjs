@@ -164,20 +164,37 @@ if (result && options) {
   const groupsByName = new Map(groups.map((group) => [group.name, group]));
   const indexOfRule = (rule) => rules.indexOf(rule);
 
-  for (const name of ['Emby', 'PikPak', 'Patreon', 'EHentai', 'Line']) {
-    check(options[name] === false, `Bettbox ${name} 必须关闭`);
+  const disabledServiceProviders = {
+    Line: ['line'],
+    Netflix: ['netflix', 'netflix_ip'],
+    PikPak: ['pikpak'],
+    Spotify: ['spotify', 'spotify_ip'],
+    Crypto: ['cryptocurrency'],
+    Patreon: ['patreon'],
+    EHentai: ['ehentai'],
+  };
+  const inlineServices = {
+    Emby: ['emby', '直连'],
+    PayPal: ['paypal', '直连'],
+  };
+  for (const name of [...Object.keys(disabledServiceProviders), ...Object.keys(inlineServices)]) {
+    check(options[name] === false, `Bettbox ${name} 的独立开关必须关闭`);
     check(!groupsByName.has(name), `Bettbox 不应再生成 ${name} 策略组`);
   }
-  check(options.生成高低倍率组 === false, 'Bettbox 高低倍率组必须关闭（防止上游字段漂移）');
-
-  for (const provider of ['emby', 'emos', 'pikpak', 'patreon', 'ehentai', 'line']) {
-    check(!providers[provider], `Bettbox 不应再生成 ${provider} 规则源`);
+  for (const [name, serviceProviders] of Object.entries(disabledServiceProviders)) {
+    for (const provider of serviceProviders) {
+      check(!providers[provider], `Bettbox ${name} 已由默认代理兜底，不应保留 ${provider} 规则源`);
+    }
   }
+  for (const [name, [provider, policy]] of Object.entries(inlineServices)) {
+    check(rules.includes(`RULE-SET,${provider},${policy}`), `Bettbox ${name} 规则必须直接归入 ${policy}`);
+  }
+  check(rules.includes('RULE-SET,emos,直连'), 'Bettbox Emby 附加规则源必须直接归入直连');
+  check(options.生成高低倍率组 === false, 'Bettbox 高低倍率组必须关闭（防止上游字段漂移）');
 
   const expectedDefaults = {
     YouTube: '默认代理',
     TikTok: '默认代理',
-    PayPal: '直连',
     AI: '美国',
   };
   for (const [name, selected] of Object.entries(expectedDefaults)) {

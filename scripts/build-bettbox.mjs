@@ -2,7 +2,7 @@
  * 拉取 AIsouler/MyClash 的 mihomo 覆写脚本，打上本地补丁，输出到 bettbox/mihomoScript.js
  *
  * 补丁原则：
- *   - 只改「默认值」和「规则顺序」，不重写逻辑
+ *   - 只改「默认值」「规则顺序」和「去分组后的出口映射」，不重写核心逻辑
  *   - 上游新增的开关/功能自动保留（不整份替换）
  *   - 必需补丁锚点找不到 → 直接报错退出，不产出坏脚本
  *
@@ -98,7 +98,8 @@ ${extraBlock}`,
       );
       cnFallbackInserted = true;
     }
-    if (!ruleOptionsEnable[svc.name]) continue;
+    // 去分组服务始终保留规则，出口已直接改写为默认代理或直连。
+    if (!INLINE_SERVICE_POLICIES[svc.name] && !ruleOptionsEnable[svc.name]) continue;
 
     functionalRules.push(...(svc.rules || []));
     functionalIpRules.push(...(svc.ipRules || []));
@@ -106,6 +107,54 @@ ${extraBlock}`,
   }
   // 极端情况下上游只剩优先服务，也不能丢失 .cn 兜底。
   if (!cnFallbackInserted) functionalRules.push('DOMAIN-SUFFIX,cn,直连');`,
+  },
+
+  // ── 必需：指定服务只保留规则，不生成独立 Selector / Bettbox 开关 ──
+  {
+    name: '指定服务去分组并内联出口',
+    required: true,
+    from: `Compatible_With_Bettbox.policyGroupOptions = serviceConfigs.map((svc) => svc.name);`,
+    to: `const INLINE_SERVICE_POLICIES = {
+  Emby: '直连',
+  PayPal: '直连',
+};
+const NO_GROUP_SERVICES = new Set([
+  'Line',
+  'Netflix',
+  'Emby',
+  'PikPak',
+  'Spotify',
+  'Crypto',
+  'PayPal',
+  'Patreon',
+  'EHentai',
+]);
+
+// 仅直连服务需要保留显式规则；默认代理服务直接由 geolocation-!cn / MATCH 兜底。
+for (const svc of serviceConfigs) {
+  const target = INLINE_SERVICE_POLICIES[svc.name];
+  if (!target) continue;
+  const suffix = \`,\${svc.name}\`;
+  const retarget = (rule) => (rule.endsWith(suffix) ? \`\${rule.slice(0, -suffix.length)},\${target}\` : rule);
+  svc.rules = (svc.rules || []).map(retarget);
+  svc.ipRules = (svc.ipRules || []).map(retarget);
+}
+
+Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
+  .filter((svc) => !NO_GROUP_SERVICES.has(svc.name))
+  .map((svc) => svc.name);`,
+  },
+  {
+    name: '去分组服务不生成 Selector',
+    required: true,
+    from: `  for (const svc of serviceConfigs) {
+    if (!ruleOptionsEnable[svc.name]) continue;
+
+    let groupProxies = [];`,
+    to: `  for (const svc of serviceConfigs) {
+    if (INLINE_SERVICE_POLICIES[svc.name] || !ruleOptionsEnable[svc.name]) continue;
+
+    let groupProxies = [];`,
   },
 
   // 注：上游 cn_ip / private_ip 本来就不带 no-resolve，无需补丁。
@@ -118,8 +167,12 @@ ${extraBlock}`,
   { name: 'FCM=关', required: false, from: /^(\s*)FCM:\s*true,/m, to: '$1FCM: false,' },
   { name: 'Twitter=关', required: false, from: /^(\s*)Twitter:\s*true,/m, to: '$1Twitter: false,' },
   { name: 'Line=关', required: false, from: /^(\s*)Line:\s*true,/m, to: '$1Line: false,' },
+  { name: 'Netflix=关', required: false, from: /^(\s*)Netflix:\s*true,/m, to: '$1Netflix: false,' },
   { name: 'Emby=关', required: false, from: /^(\s*)Emby:\s*true,/m, to: '$1Emby: false,' },
   { name: 'PikPak=关', required: false, from: /^(\s*)PikPak:\s*true,/m, to: '$1PikPak: false,' },
+  { name: 'Spotify=关', required: false, from: /^(\s*)Spotify:\s*true,/m, to: '$1Spotify: false,' },
+  { name: 'Crypto=关', required: false, from: /^(\s*)Crypto:\s*true,/m, to: '$1Crypto: false,' },
+  { name: 'PayPal=关', required: false, from: /^(\s*)PayPal:\s*true,/m, to: '$1PayPal: false,' },
   { name: 'Patreon=关', required: false, from: /^(\s*)Patreon:\s*true,/m, to: '$1Patreon: false,' },
   { name: 'EHentai=关', required: false, from: /^(\s*)EHentai:\s*true,/m, to: '$1EHentai: false,' },
   {
@@ -150,17 +203,6 @@ ${extraBlock}`,
     to: `    name: 'TikTok',
     baseOption: selectBaseOption,
     defaultSelected: '默认代理',`,
-  },
-  {
-    name: 'PayPal=直连',
-    required: false,
-    from: `    name: 'PayPal',
-    baseOption: selectBaseOption,
-    defaultSelected: '美国',`,
-    to: `    name: 'PayPal',
-    baseOption: selectBaseOption,
-    direct: true,
-    defaultSelected: '直连',`,
   },
 ];
 

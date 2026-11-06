@@ -36,12 +36,12 @@ const ruleOptionsEnable = {
   Twitter: false, // Twitter社交平台
   Meta: true, // Meta服务
   Line: false, // Line通讯软件
-  Netflix: true, // Netflix视频平台
+  Netflix: false, // Netflix视频平台
   Emby: false, // Emby媒体服务
   PikPak: false, // PikPak网盘服务
-  Spotify: true, // Spotify音乐服务
-  Crypto: true, // 加密货币相关服务
-  PayPal: true, // PayPal支付服务
+  Spotify: false, // Spotify音乐服务
+  Crypto: false, // 加密货币相关服务
+  PayPal: false, // PayPal支付服务
   Patreon: false, // Patreon创作者赞助平台
   EHentai: false, // E-Hentai网站
   AdBlock: true, // 广告拦截
@@ -761,8 +761,7 @@ const serviceConfigs = [
   {
     name: 'PayPal',
     baseOption: selectBaseOption,
-    direct: true,
-    defaultSelected: '直连',
+    defaultSelected: '美国',
     providers: {
       paypal: {
         ...ruleProviderCommonDomain,
@@ -826,7 +825,35 @@ const serviceConfigs = [
  * 适配 Bettbox 策略组开关
  * 声明哪些开关属于策略组：基础策略组 + 全部分流策略组。
  */
-Compatible_With_Bettbox.policyGroupOptions = serviceConfigs.map((svc) => svc.name);
+const INLINE_SERVICE_POLICIES = {
+  Emby: '直连',
+  PayPal: '直连',
+};
+const NO_GROUP_SERVICES = new Set([
+  'Line',
+  'Netflix',
+  'Emby',
+  'PikPak',
+  'Spotify',
+  'Crypto',
+  'PayPal',
+  'Patreon',
+  'EHentai',
+]);
+
+// 仅直连服务需要保留显式规则；默认代理服务直接由 geolocation-!cn / MATCH 兜底。
+for (const svc of serviceConfigs) {
+  const target = INLINE_SERVICE_POLICIES[svc.name];
+  if (!target) continue;
+  const suffix = `,${svc.name}`;
+  const retarget = (rule) => (rule.endsWith(suffix) ? `${rule.slice(0, -suffix.length)},${target}` : rule);
+  svc.rules = (svc.rules || []).map(retarget);
+  svc.ipRules = (svc.ipRules || []).map(retarget);
+}
+
+Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
+  .filter((svc) => !NO_GROUP_SERVICES.has(svc.name))
+  .map((svc) => svc.name);
 
 // ---节点过滤、重命名及验证---
 
@@ -1225,7 +1252,8 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
       );
       cnFallbackInserted = true;
     }
-    if (!ruleOptionsEnable[svc.name]) continue;
+    // 去分组服务始终保留规则，出口已直接改写为默认代理或直连。
+    if (!INLINE_SERVICE_POLICIES[svc.name] && !ruleOptionsEnable[svc.name]) continue;
 
     functionalRules.push(...(svc.rules || []));
     functionalIpRules.push(...(svc.ipRules || []));
@@ -1235,7 +1263,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   if (!cnFallbackInserted) functionalRules.push('DOMAIN-SUFFIX,cn,直连');
 
   for (const svc of serviceConfigs) {
-    if (!ruleOptionsEnable[svc.name]) continue;
+    if (INLINE_SERVICE_POLICIES[svc.name] || !ruleOptionsEnable[svc.name]) continue;
 
     let groupProxies = [];
     if (svc.includeAll) {

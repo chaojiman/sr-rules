@@ -47,6 +47,24 @@
 > 大陆拉不动 raw.githubusercontent.com 时，把 `https://raw.githubusercontent.com/chaojiman/sr-rules/main/`
 > 换成 `https://cdn.jsdelivr.net/gh/chaojiman/sr-rules@main/`
 
+### 更新后检查（两个客户端通用）
+
+```
+小火箭   配置 → 点当前配置右侧 ⓘ → 更新 → 回首页确认代理已开启
+Bettbox  覆写 / 脚本 → 更新 → 重连（或重启内核）
+```
+
+更新后只需确认三件事：
+
+| 检查项 | 预期 |
+| --- | --- |
+| 默认出口 | YouTube / TikTok = 默认代理，AI = 美国，PayPal = 直连 |
+| 广告拦截 | 小火箭的「广告拦截」组为 `REJECT`；Bettbox 的 `AdBlock` 组为 `REJECT` |
+| 多余分组 | Bettbox 不应再出现 Line / Netflix / Emby / PikPak / Spotify / Crypto / PayPal / Patreon / EHentai |
+
+> Bettbox 会记住你之前手动选过的出口，新默认值不一定能覆盖旧选择。上表对不上时手动点一下即可。
+> 从 URL 更新小火箭配置会重置为 `policy-select-name` 的默认值。
+
 ---
 
 ## 🔀 请求是怎么走的
@@ -272,8 +290,42 @@ node scripts/check-adblock-risk.mjs
 | GitHub 提前 | Copilot 全系自然归 GitHub，不用逐条钉 |
 | AI 提前 | `antigravity` / `gemini` 的 `*.googleapis.com` 不被谷歌抢 |
 | `.cn` 兜底 | 放在 AdBlock / GitHub / AI 后，避免 `.cn` 广告域名被提前直连；覆盖企业站/地方站 |
-| 默认开关 | 基础三组 / FCM / Twitter / 地区自动组 / 倍率组关闭；Emby / PikPak / Patreon / EHentai / Line 关闭；IPv4 优先开启 |
-| 服务默认出口 | YouTube / TikTok = 默认代理，PayPal = 直连，AI = 美国（与小火箭一致） |
+| 默认开关 | 基础三组 / FCM / Twitter / 地区自动组 / 倍率组关闭；IPv4 优先开启 |
+| 服务默认出口 | YouTube / TikTok = 默认代理，AI = 美国（与小火箭一致） |
+
+### 分组一览
+
+生成后的策略组数量取决于订阅里出现哪些地区（地区组按节点名自动生成）。
+
+**保留独立分组的服务**（可在 Bettbox 界面直接切换出口）：
+
+| 分组 | 默认出口 | 可选 |
+| --- | --- | --- |
+| YouTube | 默认代理 | 默认代理 / 各地区 / 节点 |
+| Google | 默认代理 | 同上 |
+| AI | 美国 | 同上 |
+| GitHub | 默认代理 | 同上 |
+| Telegram | 默认代理 | 同上 |
+| TikTok | 默认代理 | 同上 |
+| Meta | 默认代理 | 同上 |
+| Microsoft / Apple / Steam | 默认代理 | 同上 + 直连 |
+| AdBlock | REJECT | REJECT / REJECT-DROP / PASS |
+| 漏网之鱼 | 默认代理 | 默认代理 / 直连 / 各地区 |
+
+**不再生成分组的服务**（不会出现在 Bettbox 策略组列表里）：
+
+| 服务 | 规则是否保留 | 实际出口 |
+| --- | --- | --- |
+| Line / Netflix / PikPak / Spotify / Crypto / Patreon / EHentai | **不保留**，连规则源一起删除 | 由 `geolocation-!cn` 或 `MATCH` 兜底 → 默认代理 |
+| Emby / PayPal | **保留**，但规则直接指向 `直连` | 直连 |
+
+> 为什么默认代理的服务可以删规则：Bettbox 末尾是 `geolocation-!cn → 默认代理`、`MATCH → 漏网之鱼`（默认也是默认代理）。
+> 这些服务不删规则最终也是同一个出口，删掉只是少一次匹配和少下载几个规则源。
+>
+> Emby / PayPal 不能删：它们需要**直连**，删掉就会被兜底送去代理。
+
+这些服务的开关同时被设为 `false`，并且从 `Compatible_With_Bettbox.policyGroupOptions` 中移除，
+所以即使 Bettbox 界面保存过旧开关，也不会重新长回这些分组。
 
 ### 加临时规则
 
@@ -314,7 +366,8 @@ flowchart LR
 | 上游规则变化 | 次日自动，小火箭需手动点「更新」 |
 | 上游脚本变化 | 次日自动，Bettbox 重连生效 |
 | 改 `rules-extra.txt` | 几分钟内，Bettbox 重连生效 |
-| 改 `config.conf` | **不自动**，手机要手动更新 |
+| 改 `config.conf` | 会触发校验与规则重建，但**手机仍需手动点「更新」**才能拿到新配置 |
+| 改 `build-bettbox.mjs` | 会重新生成 `mihomoScript.js`，Bettbox 点「更新」后生效 |
 
 ---
 
