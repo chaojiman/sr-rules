@@ -254,12 +254,15 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 | 开关 | 当前 | 作用 | 回滚 |
 | --- | --- | --- | --- |
 | `block-quic` | `all-proxy`（强制 TCP） | 避免 UDP 转发质量差的节点拖慢视频 | 注释即允许 HTTP/3 |
-| `dns-server` | 仅明文 UDP（`223.5.5.5` / `119.29.29.29`） | 去掉 DoH 的 TCP+TLS 握手；`dns-direct-system = true` 仍让直连域名走系统解析 | 改回「2 DoH + 2 UDP」 |
+| `dns-server` | IP 版 DoH3 + DoH（`h3://223.5.5.5` + `https://1.12.12.12`） | 直填 IP 免引导，不往池里混明文 UDP；h3 比 `https://` 少一轮 TCP+TLS 握手 | 改回 `223.5.5.5, 119.29.29.29` |
 | `ipv6` | `true` | 本地 IPv6 不稳定时，AAAA 有结果但连不上会拖慢首次连接 | 改 `false` 试一天 |
 
 > 一次只改一个。已测过的结论：
 > - **L1 允许 HTTP/3**：已回滚，未保留。
-> - **L2 DNS 只用明文 UDP**：当前生效中。
+> - **L2 DNS 只用明文 UDP**：有一点提升，保留为回退档。
+> - **L3 DNS 换 IP 版 DoH3 + DoH**：当前生效中。速度应与 L2 持平，换来加密。
+>
+> 注意：`block-quic = all-proxy` 只拦**代理流量**的 QUIC；DNS 走 h3 是直连，不受影响。
 >
 > 改 `config.conf` 推上去只会触发校验与规则重建，**手机仍需手动点「更新」**。
 
