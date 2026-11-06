@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
+import { pathToFileURL } from 'url';
 
 const ROOT = process.cwd();
 const errors = [];
@@ -123,6 +124,25 @@ for (const file of fs.readdirSync(resolveInside('shadowrocket/rules')).filter((n
   }
 }
 
+// 逐条扇描型规则是线性开销，需要控量
+let keywordCount = 0;
+let ipPrefixKeyword = 0;
+let mitmOnlyRules = 0;
+for (const file of fs.readdirSync(resolveInside('shadowrocket/rules')).filter((name) => name.endsWith('.list'))) {
+  for (const raw of read(`shadowrocket/rules/${file}`).split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (/^DOMAIN-KEYWORD,/i.test(line)) {
+      keywordCount++;
+      if (/^DOMAIN-KEYWORD,\d{1,3}\.\d{1,3}\.\d{1,3}\.$/i.test(line)) ipPrefixKeyword++;
+    }
+    if (file === 'ads-extra.list' && /USER-AGENT|URL-REGEX/i.test(line)) mitmOnlyRules++;
+  }
+}
+check(ipPrefixKeyword === 0, `仍有 ${ipPrefixKeyword} 条 IP 前缀型 DOMAIN-KEYWORD（应转成 IP-CIDR）`);
+check(keywordCount <= 40, `DOMAIN-KEYWORD 过多（${keywordCount} 条），每请求都要逐条子串扫描`);
+check(mitmOnlyRules === 0, `ads-extra.list 仍有 ${mitmOnlyRules} 条依赖 MITM 的 USER-AGENT/URL-REGEX 规则`);
+
 // ── Bettbox：执行 main()，校验真实生成结果 ─────────────────
 const bettboxCode = read('bettbox/mihomoScript.js');
 const proxy = (name) => ({
@@ -237,6 +257,20 @@ if (result && options) {
     check(ai < google, 'Bettbox AI 必须位于 Google 之前');
   }
   check(rules.at(-1) === 'MATCH,漏网之鱼', 'Bettbox MATCH,漏网之鱼 必须是最后一条规则');
+
+  // 自建节点必须来自 bettbox/custom-proxies.mjs（否则每日同步会丢）
+  const customMod = await import(pathToFileURL(resolveInside('bettbox/custom-proxies.mjs')).href);
+  const expectedCustom = Array.isArray(customMod.default) ? customMod.default : [];
+  const generatedNames = new Set((result.proxies || []).map((item) => item.name));
+  for (const node of expectedCustom) {
+    check(node?.name && generatedNames.has(node.name), `Bettbox 自建节点未被注入：${node?.name || '(缺 name)'}`);
+  }
+  if (options.链式代理) {
+    for (const node of expectedCustom) {
+      const built = (result.proxies || []).find((item) => item.name === node.name);
+      check(built?.['dialer-proxy'] === '链式中转', `链式代理已开，但 ${node.name} 缺少 dialer-proxy`);
+    }
+  }
 
   for (const rule of rules) {
     if (rule.startsWith('RULE-SET,')) {

@@ -128,6 +128,7 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
   const extra = new Set();
   let inRule = false;
   let domains = 0;
+  let deadRules = 0;
   for (const raw of fs.readFileSync(DNS_MODULE, 'utf8').split('\n')) {
     const l = raw.trim();
     if (/^\[.+\]$/.test(l)) { inRule = l === '[Rule]'; continue; }
@@ -141,6 +142,10 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
     } else if (type === 'DOMAIN') {
       adsLines.push(value);
       domains++;
+    } else if (/\b(USER-AGENT|URL-REGEX)\b/i.test(l)) {
+      // MITM 默认关闭，HTTPS 流量看不到 User-Agent 和 URL 路径，这两类规则永远不命中。
+      // 想让它们生效请装完整版 blockAds.srmodule，而不是把死规则留在配置里。
+      deadRules++;
     } else {
       // 去掉末尾策略，其余参数（no-resolve 等）保留
       extra.add(l.replace(/,\s*REJECT(?=,no-resolve$|$)/i, ''));
@@ -149,7 +154,10 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
   const merged = dedupeDomainSet(adsLines);
   fs.writeFileSync(adsPath, merged.join('\n') + '\n');
   fs.writeFileSync(path.join(OUT, 'ads-extra.list'), [...extra].join('\n') + '\n');
-  console.log(`ads        ← 并入 DNS 版模块 ${domains} 个域名，合计 ${merged.length} 行；ads-extra ${extra.size} 条`);
+  console.log(
+    `ads        ← 并入 DNS 版模块 ${domains} 个域名，合计 ${merged.length} 行；` +
+      `ads-extra ${extra.size} 条${deadRules ? `（剔除依赖 MITM 的死规则 ${deadRules} 条）` : ''}`,
+  );
 }
 
 for (const [out, src] of Object.entries(GEOIP)) {
@@ -172,6 +180,7 @@ for (const [out, paths] of Object.entries(MERGE)) {
   if (!want(out)) continue;
   const set = new Set();
   const dropped = {};
+  let ipKeywordConverted = 0;
   for (const p of paths) {
     const txt = await get(`${BM7}/${p}`);
     for (const raw of txt.split('\n')) {
@@ -181,6 +190,15 @@ for (const [out, paths] of Object.entries(MERGE)) {
       // 只保留小火箭 RULE-SET 确定支持的类型
       if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN'].includes(type)) {
         dropped[type] = (dropped[type] || 0) + 1;
+        continue;
+      }
+      // 上游（如 WeChat.list）用 DOMAIN-KEYWORD,101.226.129. 匹配「主机名本身就是 IP」。
+      // 子串扇描代价高：转成等价 /24 CIDR 后，域名请求被 no-resolve 直接跳过，
+      // IP 请求走前缀树，且不会误伤域名里恰好包含该字串的情况。
+      const ipPrefix = l.match(/^DOMAIN-KEYWORD,(\d{1,3}\.\d{1,3}\.\d{1,3}\.)$/i);
+      if (ipPrefix) {
+        set.add(`IP-CIDR,${ipPrefix[1]}0/24,no-resolve`);
+        ipKeywordConverted++;
         continue;
       }
       // IP 规则统一加 no-resolve（见文件头说明）
@@ -196,7 +214,8 @@ for (const [out, paths] of Object.entries(MERGE)) {
   const dropNote = Object.keys(dropped).length
     ? `  (丢弃 ${Object.entries(dropped).map(([k, v]) => `${k}×${v}`).join(' ')}）`
     : '';
-  console.log(`${out.padEnd(10)} ← 合并 ${paths.length} 个源          ${String(lines.length).padStart(6)} 行${dropNote}`);
+  const convNote = ipKeywordConverted ? `  (IP 前缀 KEYWORD → CIDR×${ipKeywordConverted}）` : '';
+  console.log(`${out.padEnd(10)} ← 合并 ${paths.length} 个源          ${String(lines.length).padStart(6)} 行${dropNote}${convNote}`);
 }
 
 console.log(`\n${files} 个文件 / 合计 ${total} 行 → ${OUT}`);

@@ -11,6 +11,7 @@ on:
       - 'scripts/build-bettbox.mjs'
       - 'scripts/validate-configs.mjs'
       - 'bettbox/rules-extra.txt'
+      - 'bettbox/custom-proxies.mjs'
       - '.github/workflows/sync-bettbox.yml'
 
 permissions:

@@ -338,6 +338,44 @@ node scripts/check-adblock-risk.mjs
 这些服务的开关同时被设为 `false`，并且从 `Compatible_With_Bettbox.policyGroupOptions` 中移除，
 所以即使 Bettbox 界面保存过旧开关，也不会重新长回这些分组。
 
+### 自建节点与链式代理
+
+自建节点写在 [`bettbox/custom-proxies.mjs`](bettbox/custom-proxies.mjs)，由 `build-bettbox.mjs` 注入。
+**不要手改 `bettbox/mihomoScript.js`**，否则每日同步会覆盖。
+
+```js
+// bettbox/custom-proxies.mjs
+export default [
+  { name: '自建-落地-01', type: 'ss', server: '203.0.113.9', port: 443,
+    cipher: 'aes-128-gcm', password: 'PASSWORD' },
+];
+```
+
+留空数组 = 不使用自建节点，也不会生成「自建节点」/「链式落地」分组。
+
+**链式代理**（你的 VPS 当最终出口，机场节点当中转）：
+
+```text
+设备 → 链式中转（机场节点）→ 链式落地（自建 VPS）→ 网站
+```
+
+1. 在 `custom-proxies.mjs` 填入落地节点
+2. 把 `scripts/build-bettbox.mjs` 里的 `链式代理: true` 打开
+3. 推送 → Bettbox「更新」→ 重连
+4. Bettbox 里选：`链式中转` = 机场节点，`链式落地` = 自建节点
+
+| 分组 | 选项来源 |
+| --- | --- |
+| 链式中转 | 订阅里的全部节点 |
+| 链式落地 | `custom-proxies.mjs` 里的自建节点 |
+
+> ⚠️ 「漏网之鱼」「直连」「AdBlock」里**没有**「链式落地」选项。
+> 想让兜底流量也走链式：把「默认代理」选成链式落地，「漏网之鱼」保持默认（默认代理）。
+>
+> 链式是两跳，延迟必然高于单跳。只在「自建 VPS 被墙需要中转」或「需要固定干净落地 IP」时用。
+>
+> 自建节点不参与节点过滤和 hosts 改写，也不受「代理IPV4优先」影响；只有 IPv6 的节点请自己加 `'ip-version': 'ipv6'`。
+
 ### 加临时规则
 
 编辑 [`bettbox/rules-extra.txt`](bettbox/rules-extra.txt)，一行一条，改动会被注入到规则最前面：
@@ -377,6 +415,7 @@ flowchart LR
 | 上游规则变化 | 次日自动，小火箭需手动点「更新」 |
 | 上游脚本变化 | 次日自动，Bettbox 重连生效 |
 | 改 `rules-extra.txt` | 几分钟内，Bettbox 重连生效 |
+| 改 `custom-proxies.mjs` | 重新注入自建节点，Bettbox 点「更新」后生效 |
 | 改 `config.conf` | 会触发校验与规则重建，但**手机仍需手动点「更新」**才能拿到新配置 |
 | 改 `build-bettbox.mjs` | 会重新生成 `mihomoScript.js`，Bettbox 点「更新」后生效 |
 
@@ -388,6 +427,7 @@ flowchart LR
 | --- | --- |
 | 分流规则 / 分组 | `shadowrocket/config.conf` |
 | Bettbox 临时规则 | `bettbox/rules-extra.txt` |
+| Bettbox 自建节点 / 链式落地 | `bettbox/custom-proxies.mjs` |
 | 规则集分类增删 | `scripts/build-shadowrocket.mjs` 的 `GEOSITE` |
 | Bettbox 补丁 | `scripts/build-bettbox.mjs` 的 `REPLACES` |
 | 去广告 App 白名单 | `adblock/keep-apps.txt` |
@@ -434,6 +474,8 @@ A：不能。去广告模块依赖 MITM，而 MITM 需要代理接管流量。
 | geosite `+.example.com` | `example.com` + `.example.com` 两行 | DOMAIN-SET 不认 `+.` 前缀 |
 | geoip `1.0.1.0/24` | `IP-CIDR,1.0.1.0/24` | **不加** `no-resolve`：加了 IP 规则对域名请求直接跳过，兜底失效 |
 | 第三方规则集 `USER-AGENT` / `IP-ASN` | 当前保留；IP 类规则加 `no-resolve`，由校验脚本检查类型 | 当前生成文件已包含这两类规则；真机兼容性待逐项确认，不再宣称构建时一律丢弃 |
+| 上游 `DOMAIN-KEYWORD,101.226.129.`（IP 前缀） | `IP-CIDR,101.226.129.0/24,no-resolve` | 子串扫描换前缀树；域名请求被 `no-resolve` 直接跳过。本次转换 233 条，KEYWORD 总量 256 → 23 |
+| 去广告模块里依赖 `USER-AGENT` / `URL-REGEX` 的规则 | 丢弃 | MITM 默认关闭时 HTTPS 看不到 UA 和 URL 路径，这类规则永不命中，留着只是死规则 |
 | `ADLite.list`（RULE-SET 5.3 万条 `DOMAIN-SUFFIX`） | 本地 `adlite.list`（DOMAIN-SET 10.6 万行） | 域名集合查表比逐条规则匹配快；128 条 IP-CIDR 与 `GEOIP,CN` 重叠，丢弃 |
 | 被前序规则遮蔽的域名 | 构建时剔除 | 小火箭命中即停，这些条目永远不会生效（实测占 35.7%），白占内存 |
 

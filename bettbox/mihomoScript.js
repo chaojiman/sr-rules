@@ -80,9 +80,6 @@ const prefixRules = [
   'DOMAIN-SUFFIX,morphllm.com,美国',
   'PROCESS-PATH-REGEX,(?i)\\\\antigravity\\\\,AI',
 
-  // 规则集下载域名，避免出现鸡蛋问题
-  'DOMAIN,cdn.jsdmirror.com,直连',
-
   // 私有网络直连
   'RULE-SET,private,直连',
 
@@ -162,10 +159,10 @@ const directProxies = [
 ];
 
 // 图标 URL 公共前缀
-const iconBaseUrl = 'https://cdn.jsdmirror.com/gh/AIsouler/MyClash@main/Icons/svg/';
+const iconBaseUrl = 'https://fastly.jsdelivr.net/gh/AIsouler/MyClash@main/Icons/svg/';
 
 // 规则集 URL 公共前缀
-const ruleSetBaseUrl = 'https://cdn.jsdmirror.com/gh/appshubcc/bett-rules@meta/geo/';
+const ruleSetBaseUrl = 'https://fastly.jsdelivr.net/gh/appshubcc/bett-rules@meta/geo/';
 
 // 定义地区策略组
 const regionDefinitions = [
@@ -680,13 +677,13 @@ const serviceConfigs = [
     providers: {
       emby: {
         ...ruleProviderCommonDomain,
-        url: 'https://cdn.jsdmirror.com/gh/666OS/rules@release/mihomo/domain/Emby.mrs',
+        url: 'https://fastly.jsdelivr.net/gh/666OS/rules@release/mihomo/domain/Emby.mrs',
         path: './ruleset/emby.mrs',
         'path-in-bundle': 'geo/geosite/category-emby.mrs',
       },
       emos: {
         ...ruleProviderCommonDomain,
-        url: 'https://cdn.jsdmirror.com/gh/binaryu/emos-proxy-rule@main/rules/emos-mihomo.mrs',
+        url: 'https://fastly.jsdelivr.net/gh/binaryu/emos-proxy-rule@main/rules/emos-mihomo.mrs',
         path: './ruleset/emos.mrs',
         'path-in-bundle': 'geo/geosite/category-emby.mrs',
       },

@@ -73,10 +73,8 @@ IP-CIDR,59.111.239.61/32,no-resolve
 IP-CIDR,59.111.239.62/32,no-resolve
 IP-CIDR,115.236.121.51/32,no-resolve
 IP-CIDR,115.236.121.195/32,no-resolve
-AND,((URL-REGEX,"^http:\/\/.+\/amdc\/mobileDispatch"),(USER-AGENT,"%E9%97%B2%E9%B1%BC*"))
 DOMAIN-KEYWORD,XiaoQiang
 IP-CIDR,114.132.165.205/32,no-resolve
-USER-AGENT,"AVOS*"
 IP-CIDR,118.89.204.198/32,no-resolve
 IP-CIDR6,2402:4e00:1200:ed00:0:9089:6dac:96b6/128,no-resolve
 IP-CIDR,103.41.167.237/32,no-resolve

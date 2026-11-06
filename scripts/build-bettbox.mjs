@@ -11,6 +11,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 const SRC = 'https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js';
 const OUT = path.resolve('bettbox/mihomoScript.js');
@@ -33,6 +34,18 @@ const extraBlock = extraRules.length
     extraRules.map((l) => `  '${l.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',`).join('\n') +
     '\n'
   : '';
+
+// ── 自建节点：从 bettbox/custom-proxies.mjs 读取，注入 customizeProxies ──
+// 放在仓库里而不是手改生成文件，否则每日同步会覆盖。
+const CUSTOM_FILE = path.resolve('bettbox/custom-proxies.mjs');
+let customProxies = [];
+if (fs.existsSync(CUSTOM_FILE)) {
+  const mod = await import(pathToFileURL(CUSTOM_FILE).href);
+  customProxies = Array.isArray(mod.default) ? mod.default : [];
+}
+const customProxiesBlock = customProxies.length
+  ? `// 来自 bettbox/custom-proxies.mjs，由 build-bettbox.mjs 注入\nconst customizeProxies = ${JSON.stringify(customProxies, null, 2)};`
+  : `const customizeProxies = [];`;
 
 // ── 补丁定义 ──────────────────────────────────────────────
 // required: 锚点丢失时是否中断构建
@@ -154,6 +167,14 @@ Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
     if (INLINE_SERVICE_POLICIES[svc.name] || !ruleOptionsEnable[svc.name]) continue;
 
     let groupProxies = [];`,
+  },
+
+  // ── 必需：自建节点注入（来自 bettbox/custom-proxies.mjs）──
+  {
+    name: 'customizeProxies 注入',
+    required: true,
+    from: `const customizeProxies = [];`,
+    to: customProxiesBlock,
   },
 
   // 注：上游 cn_ip / private_ip 本来就不带 no-resolve，无需补丁。
