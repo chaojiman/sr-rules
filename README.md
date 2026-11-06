@@ -247,6 +247,19 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 | 某个 App 异常 | `[MITM] hostname` 加 `,-*.该域名` |
 | 整体不对劲 | `[MITM] enable = false`，立刻恢复原状 |
 
+### 速度相关开关
+
+`[General]` 里有几个影响体感的开关，建议**一次只改一个**，用同一节点、同一网站、冷启动（关代理 → 开代理 → 立刻访问）对比。
+
+| 开关 | 当前 | 作用 | 回滚 |
+| --- | --- | --- | --- |
+| `block-quic` | 已注释（允许 HTTP/3） | 代理流量可走 QUIC，YouTube / Google 少一次 TCP 建连 | 取消注释即强制 TCP |
+| `dns-server` | 2 DoH + 2 UDP | 明文 UDP 通常先返回；`dns-direct-system = true` 已让直连域名走系统解析 | 改回原行 |
+| `ipv6` | `true` | 本地 IPv6 不稳定时，AAAA 有结果但连不上会拖慢首次连接 | 改 `false` 试一天 |
+
+> 建议顺序：先 `block-quic`，再考虑 DNS，最后 `ipv6`。
+> 改 `config.conf` 推上去只会触发校验与规则重建，**手机仍需手动点「更新」**。
+
 ### 主 API 风险与检测
 
 模块最容易出问题的地方：**对 App 的主 API 做 MITM**，并让版本检查、配置下发这类接口返回 `{}`，App 会直接不可用或明显卡顿。
