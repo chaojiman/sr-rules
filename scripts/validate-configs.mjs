@@ -68,6 +68,19 @@ check(
 );
 check(srRuleLines.at(-1)?.startsWith('FINAL,'), '小火箭 FINAL 必须是最后一条规则');
 
+// block-quic 默认值就是 all-proxy：注释掉等于没改，必须显式写出取值
+const blockQuic = srConfig
+  .split('\n')
+  .map((line) => line.trim())
+  .find((line) => /^block-quic\s*=/i.test(line));
+check(blockQuic, 'config.conf 未显式设置 block-quic（默认值 all-proxy，注释掉等于仍在拦 QUIC）');
+if (blockQuic) {
+  check(
+    /^block-quic\s*=\s*(all-proxy|all|always-allow)$/i.test(blockQuic),
+    `block-quic 取值不合法：${blockQuic}`,
+  );
+}
+
 for (const line of srRuleLines) {
   const parts = line.split(',').map((part) => part.trim());
   const type = parts[0];

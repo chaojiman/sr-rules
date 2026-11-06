@@ -259,7 +259,7 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 
 | 开关 | 当前 | 作用 | 回滚 |
 | --- | --- | --- | --- |
-| `block-quic` | 已注释（允许 HTTP/3） | 主要不是提速：QUIC 有 Connection ID + 0-RTT，App 切后台再切回时比 TCP 更快发现死连接、恢复更快 | 取消注释即强制 TCP |
+| `block-quic` | `always-allow`（允许 HTTP/3） | 主要不是提速：QUIC 有 Connection ID + 0-RTT，App 切后台再切回时比 TCP 更快发现死连接、恢复更快 | 改成 `all-proxy` 即强制 TCP |
 | `dns-server` | 2 DoH + 2 UDP（`doh.pub` / `alidns` / `223.5.5.5` / `119.29.29.29`） | 多服务器并行查询取最快；明文 UDP 通常先返回，DoH 作为加密备选（与 LOWERTOP 的 lazy_group.conf 同组合） | 只留加密：`h3://223.5.5.5/dns-query, https://1.12.12.12/dns-query` |
 | `ipv6` | `true` | 本地 IPv6 不稳定时，AAAA 有结果但连不上会拖慢首次连接 | 改 `false` 试一天 |
 
@@ -270,6 +270,10 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 > - **`hijack-dns` 从 6 条精简到 2 条**：减少拦截判断。
 > - **再次放开 QUIC**：这次目标不是速度，而是解决 App 切后台再回前台时
 >   连接复用失效（Gemini 卡住、消息发不出去）。
+>
+> ⚠️ **`block-quic` 的默认值就是 `all-proxy`**。注释掉这一行等于回落默认值，**照样在拦**，
+> 必须显式写 `block-quic = always-allow` 才真正放开。（踩过一次：注释后以为放开了，
+> 实测 cloudflare-quic.com 仍然 HTTP/2。）
 >
 > 改 `config.conf` 推上去只会触发校验与规则重建，**手机仍需手动点「更新」并重启代理**。
 
