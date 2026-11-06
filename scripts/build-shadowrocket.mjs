@@ -133,7 +133,7 @@ for (const [out, src] of Object.entries(GEOSITE)) {
 // 模块规则优先于配置规则，装了模块等于每个请求先过一遍它的 2,900 条规则，
 // 其中 108 条 DOMAIN-KEYWORD 要逐条做子串扫描。并入后不用再装模块：
 //   - 纯域名（含 100 条其实是完整域名的 KEYWORD）→ 并进 ads.list（DOMAIN-SET，哈希查找）
-//   - 真关键词 / IP / UA / AND 逻辑规则 → ads-extra.list（RULE-SET）
+//   - 无法用域名表达的关键词 / 逻辑 / IP 规则 → ads-pattern.list（RULE-SET）
 // 读的是仓库里已提交的 blockAds-dns.srmodule（sync-adblock 在本流程之后跑，用前一天的版本）
 const DNS_MODULE = path.resolve('adblock/blockAds-dns.srmodule');
 if (want('ads') && fs.existsSync(DNS_MODULE)) {
@@ -166,11 +166,16 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
     }
   }
   const merged = dedupeDomainSet(adsLines);
+  const extraArr = [...extra];
   fs.writeFileSync(adsPath, merged.join('\n') + '\n');
-  fs.writeFileSync(path.join(OUT, 'ads-extra.list'), [...extra].join('\n') + '\n');
+  fs.writeFileSync(path.join(OUT, 'ads-pattern.list'), extraArr.join('\n') + '\n');
+  const countBy = (re) => extraArr.filter((l) => re.test(l)).length;
+  console.log(`ads         ← 域名 ${domains} 条，并入 DOMAIN-SET 后合计 ${merged.length} 行`);
   console.log(
-    `ads        ← 并入 DNS 版模块 ${domains} 个域名，合计 ${merged.length} 行；` +
-      `ads-extra ${extra.size} 条${deadRules ? `（剔除依赖 MITM 的死规则 ${deadRules} 条）` : ''}`,
+    `ads-pattern ← 关键词 ${countBy(/^DOMAIN-KEYWORD,/i)} / ` +
+      `逻辑 ${countBy(/^(AND|OR|NOT),/i)} / ` +
+      `IP ${countBy(/^IP-CIDR6?,/i)}，共 ${extraArr.length} 条（RULE-SET）` +
+      (deadRules ? `；另剔除 MITM 死规则 ${deadRules} 条` : ''),
   );
 }
 

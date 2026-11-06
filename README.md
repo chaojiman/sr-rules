@@ -42,7 +42,7 @@
 模块-DNS  https://raw.githubusercontent.com/chaojiman/sr-rules/main/adblock/blockAds-dns.srmodule
 ```
 
-> 模块-DNS 的规则已并入配置（`ads.list` + `ads-extra.list`），**不用再装**。完整版模块仍可选装，见下文「两个模块」。
+> 模块-DNS 的规则已并入配置（`ads.list` + `ads-pattern.list`），**不用再装**。完整版模块仍可选装，见下文「两个模块」。
 
 > 大陆拉不动 raw.githubusercontent.com 时，把 `https://raw.githubusercontent.com/chaojiman/sr-rules/main/`
 > 换成 `https://cdn.jsdelivr.net/gh/chaojiman/sr-rules@main/`
@@ -148,7 +148,7 @@ flowchart TD
 ### 规则顺序（36 条）
 
 ```
-1    广告拦截      adlite + ads + ads-extra（含原 DNS 版模块）
+1    广告拦截      adlite + ads + ads-pattern（含原 DNS 版模块）
 1.5  显式优先      snssdk 直连、muse.ai、okx
 2    GitHub → AI   github → ai → ai-extra（OpenAI + Gemini）
 3    流媒体        YouTube
@@ -194,8 +194,14 @@ flowchart TD
 
 | 层 | 手段 | 风险 | 拦什么 |
 | --- | --- | --- | --- |
-| 1 | DNS 规则（adlite 5.3 万域名 + ads.list 3.2 千条 + ads-extra 85 条） | 零 | 独立广告域名、广告 SDK |
+| 1 | DNS 规则（adlite 5.3 万域名 + ads.list 2.8 千条 + ads-pattern 83 条） | 零 | 独立广告域名、广告 SDK |
 | 2 | MITM 模块 | 低 | App 内信息流、开屏、弹窗 |
+
+> `ads-pattern.list` 装的是**无法用域名表达**的规则：
+> 广告 SDK 关键词（`umeng`、`adform`、`pangolin-sdk-toutiao`…）、
+> `AND` 逻辑（抖音/头条的 QUIC 广告端点、B 站直播 `stun`/`tracker`）、
+> 以及 35 个广告 IP。域名部分全部进了 `ads.list`（DOMAIN-SET 哈希查找），
+> 这里只剩需要逐条扫描的那部分——目前 11 关键词 + 37 逻辑 + 35 IP。
 
 ### 两个模块
 

@@ -136,12 +136,12 @@ for (const file of fs.readdirSync(resolveInside('shadowrocket/rules')).filter((n
       keywordCount++;
       if (/^DOMAIN-KEYWORD,\d{1,3}\.\d{1,3}\.\d{1,3}\.$/i.test(line)) ipPrefixKeyword++;
     }
-    if (file === 'ads-extra.list' && /USER-AGENT|URL-REGEX/i.test(line)) mitmOnlyRules++;
+    if (file === 'ads-pattern.list' && /USER-AGENT|URL-REGEX/i.test(line)) mitmOnlyRules++;
   }
 }
 check(ipPrefixKeyword === 0, `仍有 ${ipPrefixKeyword} 条 IP 前缀型 DOMAIN-KEYWORD（应转成 IP-CIDR）`);
 check(keywordCount <= 40, `DOMAIN-KEYWORD 过多（${keywordCount} 条），每请求都要逐条子串扫描`);
-check(mitmOnlyRules === 0, `ads-extra.list 仍有 ${mitmOnlyRules} 条依赖 MITM 的 USER-AGENT/URL-REGEX 规则`);
+check(mitmOnlyRules === 0, `ads-pattern.list 仍有 ${mitmOnlyRules} 条依赖 MITM 的 USER-AGENT/URL-REGEX 规则`);
 
 // DOMAIN-SET 里不得有被更宽后缀罩住的条目（纯内存浪费）
 function countShadowedDomainSet(lines) {
