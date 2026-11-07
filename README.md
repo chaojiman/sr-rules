@@ -259,8 +259,9 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 
 | 开关 | 当前 | 作用 | 回滚 |
 | --- | --- | --- | --- |
-| `block-quic` | `always-allow`（允许 HTTP/3） | 主要不是提速：QUIC 有 Connection ID + 0-RTT，App 切后台再切回时比 TCP 更快发现死连接、恢复更快 | 改成 `all-proxy` 即强制 TCP |
+| `block-quic` | `all-proxy`（强制 TCP） | 本节点走不通 UDP 443：放行 QUIC 只会让客户端空等握手超时再降级；本地拒绝可立即回退 TCP | 改成 `always-allow` 即允许 HTTP/3 |
 | `dns-server` | 2 DoH + 2 UDP（`doh.pub` / `alidns` / `223.5.5.5` / `119.29.29.29`） | 多服务器并行查询取最快；明文 UDP 通常先返回，DoH 作为加密备选（与 LOWERTOP 的 lazy_group.conf 同组合） | 只留加密：`h3://223.5.5.5/dns-query, https://1.12.12.12/dns-query` |
+| `dns-direct-system` | `false`（直连也走 DNS 池） | 避免直连域名回落运营商系统 DNS；`[Host]` 已为 `*.apple.com` / `*.icloud.com` 保留系统解析 | 改回 `true` |
 | `ipv6` | `true` | 本地 IPv6 不稳定时，AAAA 有结果但连不上会拖慢首次连接 | 改 `false` 试一天 |
 
 > 一次只改一个。已测过的结论：
@@ -268,11 +269,14 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 > - **L2 DNS 只用明文 UDP**：有一点提升，保留为回退档。
 > - **L3 DNS 换 IP 版 DoH3 + DoH**：速度与 L2 持平，已改回 2 DoH + 2 UDP（取两者之长）。
 > - **`hijack-dns` 从 6 条精简到 2 条**：减少拦截判断。
-> - **再次放开 QUIC**：这次目标不是速度，而是解决 App 切后台再回前台时
+> - **再次放开 QUIC**：目标不是速度，而是解决 App 切后台再回前台时
 >   连接复用失效（Gemini 卡住、消息发不出去）。
+> - **实测 QUIC 走不通，已改回 `all-proxy`**：21 分钟内 751 条 `:443` 连接全为 TCP，
+>   零 UDP:443，cloudflare-quic.com 始终 HTTP/2。既然链路不支持，本地拒绝比放行更快。
+> - **`dns-direct-system` 改为 `false`**：直连域名也走 DoH/UDP 池，不再回落运营商 DNS。
 >
-> ⚠️ **`block-quic` 的默认值就是 `all-proxy`**。注释掉这一行等于回落默认值，**照样在拦**，
-> 必须显式写 `block-quic = always-allow` 才真正放开。（踩过一次：注释后以为放开了，
+> ⚠️ **`block-quic` 的默认值就是 `all-proxy`**。注释掉这一行等于回落默认值，**照样在拦**。
+> 要允许 HTTP/3 必须显式写 `block-quic = always-allow`。（踩过一次：注释后以为放开了，
 > 实测 cloudflare-quic.com 仍然 HTTP/2。）
 >
 > 改 `config.conf` 推上去只会触发校验与规则重建，**手机仍需手动点「更新」并重启代理**。
