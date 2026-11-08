@@ -256,7 +256,6 @@
 .video-dsp.pddpic.com
 .video-ad.sm.cn
 .analytics.tiktok.com
-.analytics.twitter.com
 .analytics.woozooo.com
 .analytics.yahoo.com
 .v2-api-channel-launcher.hismarttv.com
@@ -460,7 +459,6 @@
 .ads-jp.tiktok.com
 .ads-img-qc.xhscdn.com
 .ads-img-al.xhscdn.com
-.ads-api.twitter.com
 .gorgon.youdao.com
 .ads-api.tiktok.com
 .adm.funshion.com
@@ -2712,11 +2710,6 @@ ta.tuhu.cn
 .d.turn.com
 .fan.twitch.tv
 .spade.twitch.tv
-.p.twitter.com
-.scribe.twitter.com
-.syndication.twitter.com
-.syndication-o.twitter.com
-.urls.api.twitter.com
 .static-xl9-ssl.xunlei.com
 .biz.live.xunlei.com
 .ct.niu.xunlei.com
