@@ -61,6 +61,8 @@ const srRuleLines = sectionLines(srConfig, 'Rule')
   .filter((line) => line && !line.startsWith('#'));
 const srPrefix = 'https://raw.githubusercontent.com/chaojiman/sr-rules/main/shadowrocket/rules/';
 const domainSetFiles = new Set();
+// 只校验 config.conf 实际引用的文件；未被引用的孤儿文件（例如做 A/B 时注释掉的规则集）不参与
+const localRuleFiles = new Set();
 
 check(
   /^YouTube = select,.*policy-select-name=PROXY$/m.test(srConfig),
@@ -92,6 +94,7 @@ for (const line of srRuleLines) {
       const file = url.slice(srPrefix.length);
       check(file === path.basename(file), `小火箭规则文件名异常：${file}`);
       check(fs.existsSync(resolveInside('shadowrocket/rules', file)), `小火箭缺少本地规则：${file}`);
+      localRuleFiles.add(file);
       if (type === 'DOMAIN-SET') domainSetFiles.add(file);
     }
   } else if (type === 'FINAL') {
@@ -122,7 +125,7 @@ const srAllowedTypes = new Set([
 const bareDomain = /^\.?[\p{L}\p{N}*_-]+(?:\.[\p{L}\p{N}*_-]+)*$/u;
 let srRuleCount = 0;
 
-for (const file of fs.readdirSync(resolveInside('shadowrocket/rules')).filter((name) => name.endsWith('.list')).sort()) {
+for (const file of [...localRuleFiles].sort()) {
   const lines = read(`shadowrocket/rules/${file}`).split('\n');
   for (const [index, raw] of lines.entries()) {
     const line = raw.trim();
@@ -141,7 +144,7 @@ for (const file of fs.readdirSync(resolveInside('shadowrocket/rules')).filter((n
 let keywordCount = 0;
 let ipPrefixKeyword = 0;
 let mitmOnlyRules = 0;
-for (const file of fs.readdirSync(resolveInside('shadowrocket/rules')).filter((name) => name.endsWith('.list'))) {
+for (const file of [...localRuleFiles].sort()) {
   for (const raw of read(`shadowrocket/rules/${file}`).split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
