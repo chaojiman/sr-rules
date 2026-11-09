@@ -48,6 +48,41 @@ const GEOIP = {
   'private-ip': 'private',
 };
 
+// 金融域名：永不走代理。走代理会让银行看到海外机房 IP，触发风控/二次验证。
+// 只收大陆可直连的机构：香港银行/券商 + 大陆银行的海外分行。
+// 加密交易所（binance/okx/coinbase…）和美国券商（IBKR/Schwab…）保持走代理，
+// 否则在大陆会直接打不开。
+const FINANCE = [
+  // 香港银行
+  '.hsbc',
+  '.hsbc.com',
+  '.hsbc.net',
+  '.hsbc.com.hk',
+  '.hsbcnet.com',
+  '.hsbcprivatebank.com',
+  '.hsbcinnovationbanking.com',
+  '.bochk.com',
+  '.icbci.com.hk',
+  '.icbcasia.com',
+  '.ccbintl.com.hk',
+  '.citics.com.hk',
+  '.pingan.com.hk',
+  '.sc.com',
+  '.standardchartered.com',
+  '.mox.live',
+  // 香港券商（大陆可直连，走代理反而慢）
+  '.futuhk.com',
+  '.futu5.com',
+  '.futunn.com',
+  '.longbridge.hk',
+  '.longbridge.com',
+  // 大陆银行的海外分行
+  '.icbc-ltd.com',
+  '.icbc-uk.com',
+  '.icbclondon.com',
+  '.ccbseoul.com',
+];
+
 // 合并类：把多个 blackmatrix7 规则集合成 1 个（减少引用条数）
 const BM7 = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule';
 const MERGE = {
@@ -193,6 +228,15 @@ for (const [out, src] of Object.entries(GEOIP)) {
   total += lines.length;
   files++;
   console.log(`${out.padEnd(10)} ← geoip/${src.padEnd(24)} ${String(lines.length).padStart(6)} 行`);
+}
+
+// 金融域名：静态列表，永远不走代理
+if (want('finance')) {
+  const lines = [...new Set(FINANCE)].map((d) => (d.startsWith('.') ? d : '.' + d));
+  fs.writeFileSync(path.join(OUT, 'finance.list'), lines.join('\n') + '\n');
+  total += lines.length;
+  files++;
+  console.log(`finance    ← 静态列表（香港银行/券商）   ${String(lines.length).padStart(6)} 行`);
 }
 
 for (const [out, paths] of Object.entries(MERGE)) {

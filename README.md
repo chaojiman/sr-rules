@@ -229,14 +229,22 @@ flowchart TD
 
 **新 App 想去广告**：在上游模块里搜 `# > App名`，把段名原样加进 `keep-apps.txt` 并提交，CI 自动重建。
 
-配置里还有第二重保险：
+**金融保护已从 MITM 层移到路由层。** 以前靠 `[MITM] hostname` 的 58 条负向排除，
+但 MITM 关闭时那一段**不产生任何效果**，容易让人误以为已被保护。现在改由
+[`finance.list`](shadowrocket/rules/finance.list) 承担：
 
 ```ini
-[MITM]
-hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名负向排除
+DOMAIN-SET,.../finance.list,DIRECT
 ```
 
-即使以后误装了别的模块，这些域名也永远不会被解密。
+覆盖香港银行/券商（汇丰、中银香港、工银亚洲、建行亚洲、中信证券国际、
+平安香港、渣打、Mox、富途、长桥）和大陆银行的海外分行。
+
+> 加密交易所（binance / okx / coinbase）和美国券商（IBKR / Schwab）**不在此列**——
+> 它们在大陆被墙或极慢，仍然走代理。
+>
+> 为什么必须直连：银行看到海外机房 IP 会判定异常登录，触发验证码、短信、
+> 甚至临时冻结。这类风控比被解密更隐蔽，因为你可能只偶尔遇到「登录异常」。
 
 > ⚠️ **模块 `[Rule]` 优先于 `config.conf`**（与配置内的顺序无关）。模块里的 `REJECT` 会盖掉配置里的 `DIRECT`，
 > 所以在 `config.conf` 里补一条 `DOMAIN-SUFFIX,xxx,DIRECT` **救不了**被模块误伤的域名 —— 只能改构建脚本
@@ -250,8 +258,9 @@ hostname = -*.ccb.com,-*.icbc.com.cn,-*.pingan.com.cn,...   # 58 条金融域名
 
 | 症状 | 处理 |
 | --- | --- |
-| 某个 App 异常 | `[MITM] hostname` 加 `,-*.该域名` |
+| 某个 App 异常（装了模块时） | `[MITM] hostname` 加 `,-*.该域名` |
 | 整体不对劲 | `[MITM] enable = false`，立刻恢复原状 |
+| 银行 App 风控异常 | 检查 `finance.list` 是否包含该银行域名 |
 
 ### 速度相关开关
 
