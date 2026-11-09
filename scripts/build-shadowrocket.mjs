@@ -32,6 +32,7 @@ const GEOSITE = {
   microsoft: 'microsoft',
   apple: 'apple',
   paypal: 'paypal',
+  china: 'geolocation-cn',
   // 境外已知域名。作用不是「兜底」（FINAL 也能兜），而是让境外域名在
   // 命中 GEOIP 之前就确定走向，避免触发本地 DNS 解析 —— 国内 DoH 对
   // 境外域名普遍返回污染 IP（如 okx → 169.254.0.2），一旦解析就会误判。
@@ -84,6 +85,21 @@ const FINANCE = [
 // X/Twitter：独立规则集。必须在广告 DOMAIN-SET 之前引用，
 // 否则 ads.list 里的 Twitter 子域会先命中 REJECT。
 const TWITTER = ['.twitter.com', '.x.com', '.twimg.com', '.t.co'];
+
+// Telegram 的 IP 段：MTProto 会直接连 IP，不走域名，
+// 只有域名规则时这些连接会落到漏网之鱼，不会跟随 Telegram 分组。
+const TELEGRAM_IP = [
+  'IP-CIDR,91.108.4.0/22,no-resolve',
+  'IP-CIDR,91.108.8.0/22,no-resolve',
+  'IP-CIDR,91.108.12.0/22,no-resolve',
+  'IP-CIDR,91.108.16.0/22,no-resolve',
+  'IP-CIDR,91.108.56.0/22,no-resolve',
+  'IP-CIDR,109.239.140.0/24,no-resolve',
+  'IP-CIDR,149.154.160.0/20,no-resolve',
+  'IP-CIDR6,2001:B28:F23D::/48,no-resolve',
+  'IP-CIDR6,2001:B28:F23F::/48,no-resolve',
+  'IP-CIDR6,2001:67C:4E8::/48,no-resolve',
+];
 
 // 把 geosite 源并入 MERGE 输出（同为「游戏平台」策略，合并后少一行引用）
 const MERGE_GEOSITE = {
@@ -263,6 +279,14 @@ if (want('twitter')) {
   total += lines.length;
   files++;
   console.log(`twitter    ← 静态列表（X 全站）          ${String(lines.length).padStart(6)} 行`);
+}
+
+// Telegram IP 段静态列表（RULE-SET 格式，含类型和 no-resolve）
+if (want('telegram-ip')) {
+  fs.writeFileSync(path.join(OUT, 'telegram-ip.list'), TELEGRAM_IP.join('\n') + '\n');
+  total += TELEGRAM_IP.length;
+  files++;
+  console.log(`telegram-ip← 静态列表（MTProto IP 段）    ${String(TELEGRAM_IP.length).padStart(6)} 行`);
 }
 
 for (const [out, paths] of Object.entries(MERGE)) {

@@ -94,6 +94,8 @@ for (const line of srRuleLines) {
       const file = url.slice(srPrefix.length);
       check(file === path.basename(file), `小火箭规则文件名异常：${file}`);
       check(fs.existsSync(resolveInside('shadowrocket/rules', file)), `小火箭缺少本地规则：${file}`);
+      // 同一规则集被引用两次会让构建把它裁剪两遍（第二遍会把已裁剪的内容再裁一次）
+      check(!localRuleFiles.has(file), `规则集重复引用：${file}（构建会裁剪两遍）`);
       localRuleFiles.add(file);
       if (type === 'DOMAIN-SET') domainSetFiles.add(file);
     }
