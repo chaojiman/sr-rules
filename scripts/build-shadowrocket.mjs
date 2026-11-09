@@ -106,6 +106,15 @@ const MERGE_GEOSITE = {
   games: ['steam'],
 };
 
+// 从 MERGE 输出里剔除的条目（正则匹配整行）。
+// ai-extra 来自 blackmatrix7 的 OpenAI/Gemini 规则集，会把「OpenAI 依赖的第三方服务」
+// 一并划给 AI 组。下面两条范围过宽：
+//   apis.google.com —— Google 登录/Drive/Firebase 都会走美国 AI 节点，应归「谷歌服务」
+//   IP-ASN,20473    —— 整个 Vultr ASN，所有托管在 Vultr 上按 IP 连接的服务都会进 AI 组
+const MERGE_DROP = {
+  'ai-extra': [/^DOMAIN-SUFFIX,apis\.google\.com$/i, /^IP-ASN,20473(,|$)/i],
+};
+
 // 追加到 MERGE 输出的补充规则（原来 inline 在 config.conf 里）
 // 注：sharepoint.cn 不在内——它是世纪互联运营的国内版 SharePoint，
 // 走「微软服务」默认的 PROXY 会让上传下载绕行海外。交给 .cn 后缀直连。
@@ -303,6 +312,7 @@ for (const [out, paths] of Object.entries(MERGE)) {
   const set = new Set();
   const dropped = {};
   let ipKeywordConverted = 0;
+  let overbroadDropped = 0;
   for (const p of paths) {
     const txt = await get(`${BM7}/${p}`);
     for (const raw of txt.split('\n')) {
@@ -312,6 +322,11 @@ for (const [out, paths] of Object.entries(MERGE)) {
       // 只保留小火箭 RULE-SET 确定支持的类型
       if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN'].includes(type)) {
         dropped[type] = (dropped[type] || 0) + 1;
+        continue;
+      }
+      // 剔除范围过宽的条目（见 MERGE_DROP 说明）
+      if ((MERGE_DROP[out] || []).some((re) => re.test(l))) {
+        overbroadDropped++;
         continue;
       }
       // 上游（如 WeChat.list）用 DOMAIN-KEYWORD,101.226.129. 匹配「主机名本身就是 IP」。
@@ -349,7 +364,8 @@ for (const [out, paths] of Object.entries(MERGE)) {
     ? `  (丢弃 ${Object.entries(dropped).map(([k, v]) => `${k}×${v}`).join(' ')}）`
     : '';
   const convNote = ipKeywordConverted ? `  (IP 前缀 KEYWORD → CIDR×${ipKeywordConverted}）` : '';
-  console.log(`${out.padEnd(10)} ← 合并 ${paths.length} 个源          ${String(lines.length).padStart(6)} 行${dropNote}${convNote}`);
+  const overbroadNote = overbroadDropped ? `  (剔除过宽条目×${overbroadDropped}）` : '';
+  console.log(`${out.padEnd(10)} ← 合并 ${paths.length} 个源          ${String(lines.length).padStart(6)} 行${dropNote}${convNote}${overbroadNote}`);
 }
 
 console.log(`\n${files} 个文件 / 合计 ${total} 行 → ${OUT}`);
