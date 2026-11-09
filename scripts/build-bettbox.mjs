@@ -237,6 +237,44 @@ Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
     baseOption: selectBaseOption,
     defaultSelected: '默认代理',`,
   },
+
+  // ── AI 组只保留真正的 AI 服务 ──
+  // 上游把 OpenAI 用到的通用第三方（Intercom 客服、Fathom 统计）也划给了 AI 组，
+  // 导致所有接入这些服务的站点都被固定走 AI 组（默认美国）。
+  // 剔除后它们落回 MATCH,漏网之鱼，与小火箭 ai-extra 的处理一致。
+  {
+    name: 'AI 组剔除通用第三方服务',
+    required: false,
+    from: `    rules: [
+      'RULE-SET,ai,AI',
+      'DOMAIN,cdn.usefathom.com,AI',
+      'DOMAIN-SUFFIX,intercom.io,AI',
+      'DOMAIN-SUFFIX,intercomcdn.com,AI',
+    ],`,
+    to: `    // 通用第三方（Intercom 客服 / Fathom 统计）已剔除，落回 MATCH,漏网之鱼
+    rules: ['RULE-SET,ai,AI'],`,
+  },
+
+  // ── 地区组补「韩国」──
+  // 上游只有港/日/美/新/台。开着「过滤非地区节点」时，韩国节点会被当成
+  // 非地区节点直接丢掉，在任何策略组里都选不到。
+  // 补上后所有服务组自动获得该选项（groupProxies 用的是全量地区组）。
+  {
+    name: '地区组补韩国',
+    required: false,
+    from: `  {
+    name: '新加坡',
+    flag: '🇸🇬',`,
+    to: `  {
+    name: '韩国',
+    flag: '🇰🇷',
+    regex: /🇰🇷|韩国|首尔|韓|春川|(?<![A-Za-z])(?:KOR|KR)(?![A-Za-z])|korea/i,
+    // 上游 Icons 目录没有 Korea.svg（实测 404），不填 icon 用默认图标
+  },
+  {
+    name: '新加坡',
+    flag: '🇸🇬',`,
+  },
 ];
 
 // ── 执行 ─────────────────────────────────────────────────

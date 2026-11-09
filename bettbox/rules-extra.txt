@@ -9,7 +9,7 @@
 #   DOMAIN,sub.example.com,GitHub
 #   DOMAIN-KEYWORD,foobar,默认代理
 #
-# 组名必须是：默认代理 / 直连 / 香港 / 日本 / 美国 / 新加坡 / 台湾 /
+# 组名必须是：默认代理 / 直连 / 香港 / 日本 / 美国 / 新加坡 / 台湾 / 韩国 /
 #             GitHub / AI / Google / YouTube / Netflix ...
 
 # ===== Tailscale 内网直连 =====
@@ -41,3 +41,14 @@ DOMAIN-SUFFIX,morphllm.com,美国
 #    脚本里写 find-process-mode 会被界面覆盖，写了也不生效
 # ⚠️ 系统代理模式下 language_server.exe 不读系统代理，请用 bettbox/Antigravity-proxy.cmd 启动
 PROCESS-PATH-REGEX,(?i)\\antigravity\\,AI
+
+# ===== ChatGPT / OpenAI 登录所需的 Arkose 验证 =====
+# geosite category-ai-!cn 未收录 arkoselabs，缺这两条会在登录页卡在验证码
+# （小火箭靠 ai-extra.list 补同一个洞）
+DOMAIN,openai-api.arkoselabs.com,AI
+DOMAIN-SUFFIX,client-api.arkoselabs.com,AI
+# OpenAI 自建服务器 IP，不在 geoip 库里
+IP-CIDR,24.199.123.28/32,AI,no-resolve
+IP-CIDR,64.23.132.171/32,AI,no-resolve
+# 兜底：所有含 openai 的子域
+DOMAIN-KEYWORD,openai,AI

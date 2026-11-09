@@ -239,7 +239,7 @@ const proxy = (name) => ({
   password: 'validation-only',
 });
 const input = {
-  proxies: [proxy('🇭🇰 香港 01'), proxy('🇺🇸 美国 01'), proxy('🇯🇵 日本 01')],
+  proxies: [proxy('🇭🇰 香港 01'), proxy('🇺🇸 美国 01'), proxy('🇯🇵 日本 01'), proxy('🇰🇷 韩国 01')],
   dns: {
     nameserver: ['223.5.5.5'],
     'proxy-server-nameserver': ['223.5.5.5'],
@@ -273,6 +273,32 @@ if (result && options) {
   check(/^\/\/ ═+ sr-rules 构建标记/.test(bettboxCode), 'Bettbox 产物缺少 sr-rules 构建标记横幅');
   check(/^\/\/ 生成日期: \d{4}-\d{2}-\d{2}$/m.test(bettboxCode), 'Bettbox 构建横幅缺少生成日期');
   check(/^\/\/ 上游版本: \S/m.test(bettboxCode), 'Bettbox 构建横幅缺少上游版本（ETag）');
+
+  // AI 组只应包含真正的 AI 服务。Intercom/Fathom/Stripe 等通用第三方被钉在 AI 组，
+  // 会让所有接入它们的站点固定走 AI 出口（默认美国）。
+  const AI_GENERIC_THIRD_PARTY = [
+    'cdn.usefathom.com',
+    'intercom.io',
+    'intercomcdn.com',
+    'stripe.com',
+    'sentry.io',
+    'auth0.com',
+    'algolia.net',
+    'identrust.com',
+  ];
+  for (const domain of AI_GENERIC_THIRD_PARTY) {
+    check(
+      !rules.some((rule) => rule.includes(domain) && /,AI$/.test(rule)),
+      `Bettbox AI 组不应包含通用第三方服务：${domain}`,
+    );
+  }
+  // geosite category-ai-!cn 未收录 Arkose，必须由 rules-extra.txt 补，否则登录卡验证码
+  for (const domain of ['openai-api.arkoselabs.com', 'client-api.arkoselabs.com']) {
+    check(
+      rules.some((rule) => rule.includes(domain) && /,AI$/.test(rule)),
+      `Bettbox AI 组缺少 Arkose 验证域名：${domain}`,
+    );
+  }
 
   const disabledServiceProviders = {
     Line: ['line'],
@@ -321,6 +347,8 @@ if (result && options) {
     const manual = groupsByName.get(auto.name.replace(/-自动选择$/, ''));
     check(manual?.proxies?.includes(auto.name), `Bettbox 地区组 ${manual?.name || '?'} 应包含 ${auto.name}`);
   }
+  // 上游只有港/日/美/新/台；开着「过滤非地区节点」时韩国节点会被丢掉
+  check(groupsByName.has('韩国'), 'Bettbox 必须生成「韩国」地区组');
 
   const expectedDefaults = {
     YouTube: '默认代理',

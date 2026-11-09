@@ -83,6 +83,11 @@ const prefixRules = [
   'PROCESS-NAME,tailscaled.exe,直连',
   'DOMAIN-SUFFIX,morphllm.com,美国',
   'PROCESS-PATH-REGEX,(?i)\\\\antigravity\\\\,AI',
+  'DOMAIN,openai-api.arkoselabs.com,AI',
+  'DOMAIN-SUFFIX,client-api.arkoselabs.com,AI',
+  'IP-CIDR,24.199.123.28/32,AI,no-resolve',
+  'IP-CIDR,64.23.132.171/32,AI,no-resolve',
+  'DOMAIN-KEYWORD,openai,AI',
 
   // 私有网络直连
   'RULE-SET,private,直连',
@@ -188,6 +193,12 @@ const regionDefinitions = [
     regex:
       /🇺🇸|美国|纽约|洛杉矶|旧金山|芝加哥|休斯顿|迈阿密|西雅图|波士顿|华盛顿|拉斯维加斯|圣何塞|(?<![A-Za-z])USA?(?![A-Za-z])|america|united\s*states/i,
     icon: `${iconBaseUrl}America.svg`,
+  },
+  {
+    name: '韩国',
+    flag: '🇰🇷',
+    regex: /🇰🇷|韩国|首尔|韓|春川|(?<![A-Za-z])(?:KOR|KR)(?![A-Za-z])|korea/i,
+    // 上游 Icons 目录没有 Korea.svg（实测 404），不填 icon 用默认图标
   },
   {
     name: '新加坡',
@@ -466,12 +477,8 @@ const serviceConfigs = [
       },
     },
     icon: `${iconBaseUrl}OpenAI.svg`,
-    rules: [
-      'RULE-SET,ai,AI',
-      'DOMAIN,cdn.usefathom.com,AI',
-      'DOMAIN-SUFFIX,intercom.io,AI',
-      'DOMAIN-SUFFIX,intercomcdn.com,AI',
-    ],
+    // 通用第三方（Intercom 客服 / Fathom 统计）已剔除，落回 MATCH,漏网之鱼
+    rules: ['RULE-SET,ai,AI'],
   },
   {
     name: 'GitHub',
