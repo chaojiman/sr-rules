@@ -3,11 +3,8 @@ configuration-lb.ls-apple.com.akadns.net
 push-apple.com.akadns.net
 notary-submissions-prod.s3-accelerate.amazonaws.com
 notary-submissions-prod.s3.us-west-2.amazonaws.com
-appleworldwidedeveloper.hb-api.omtrdc.net
-appleworldwidedeveloper.sc.omtrdc.net
 p-events-delivery.akamaized.net
 www-cdn.icloud.com.akadns.net
-beatselectronicsllc.tt.omtrdc.net
 .apple
 .casquebeatsfracheter.com
 .casquebeatsenligne.com
