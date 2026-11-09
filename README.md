@@ -80,7 +80,7 @@ flowchart TD
 
     C -->|"① 广告规则<br/>adlite + ads.list"| R1[REJECT]
     C -->|"② 服务规则<br/>AI / GitHub / YouTube…"| R2[对应分组出口]
-    C -->|"③ 国内域名<br/>.cn / china.list / cn-direct"| R3[DIRECT]
+    C -->|"③ 国内域名<br/>.cn / cn-direct / 服务规则"| R3[DIRECT]
     C -->|"④ 未命中 ↓"| D{"global.list<br/>境外已知域名"}
 
     D -->|命中| P1[漏网之鱼]

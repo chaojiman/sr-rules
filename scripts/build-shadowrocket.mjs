@@ -32,8 +32,6 @@ const GEOSITE = {
   microsoft: 'microsoft',
   apple: 'apple',
   paypal: 'paypal',
-  steam: 'steam',
-  china: 'geolocation-cn',
   // 境外已知域名。作用不是「兜底」（FINAL 也能兜），而是让境外域名在
   // 命中 GEOIP 之前就确定走向，避免触发本地 DNS 解析 —— 国内 DoH 对
   // 境外域名普遍返回污染 IP（如 okx → 169.254.0.2），一旦解析就会误判。
@@ -82,6 +80,25 @@ const FINANCE = [
   '.icbclondon.com',
   '.ccbseoul.com',
 ];
+
+// X/Twitter：独立规则集。必须在广告 DOMAIN-SET 之前引用，
+// 否则 ads.list 里的 Twitter 子域会先命中 REJECT。
+const TWITTER = ['.twitter.com', '.x.com', '.twimg.com', '.t.co'];
+
+// 把 geosite 源并入 MERGE 输出（同为「游戏平台」策略，合并后少一行引用）
+const MERGE_GEOSITE = {
+  games: ['steam'],
+};
+
+// 追加到 MERGE 输出的补充规则（原来 inline 在 config.conf 里）
+const MERGE_EXTRA = {
+  onedrive: [
+    'DOMAIN-SUFFIX,1drv.ms',
+    'DOMAIN-SUFFIX,onedrive.co',
+    'DOMAIN-SUFFIX,onedrive.eu',
+    'DOMAIN-SUFFIX,sharepoint.cn',
+  ],
+};
 
 // 合并类：把多个 blackmatrix7 规则集合成 1 个（减少引用条数）
 const BM7 = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule';
@@ -239,6 +256,15 @@ if (want('finance')) {
   console.log(`finance    ← 静态列表（香港银行/券商）   ${String(lines.length).padStart(6)} 行`);
 }
 
+// X/Twitter 静态列表
+if (want('twitter')) {
+  const lines = [...new Set(TWITTER)].map((d) => (d.startsWith('.') ? d : '.' + d));
+  fs.writeFileSync(path.join(OUT, 'twitter.list'), lines.join('\n') + '\n');
+  total += lines.length;
+  files++;
+  console.log(`twitter    ← 静态列表（X 全站）          ${String(lines.length).padStart(6)} 行`);
+}
+
 for (const [out, paths] of Object.entries(MERGE)) {
   if (!want(out)) continue;
   const set = new Set();
@@ -270,6 +296,18 @@ for (const [out, paths] of Object.entries(MERGE)) {
       set.add(l);
     }
   }
+  // 补充 geosite 源（如 steam → games）
+  for (const gs of MERGE_GEOSITE[out] || []) {
+    const txt = await get(`${SRC}/geosite/${gs}.list`);
+    for (const raw of txt.split('\n')) {
+      const d = raw.trim();
+      if (!d || d.startsWith('#')) continue;
+      set.add(d.startsWith('+.') ? `DOMAIN-SUFFIX,${d.slice(2)}` : `DOMAIN,${d}`);
+    }
+  }
+  // 补充 inline 规则（如 onedrive 的 4 个域名）
+  for (const l of MERGE_EXTRA[out] || []) set.add(l);
+
   const lines = [...set];
   fs.writeFileSync(path.join(OUT, out + '.list'), lines.join('\n') + '\n');
   total += lines.length;
