@@ -108,11 +108,18 @@ const MERGE_GEOSITE = {
 
 // 从 MERGE 输出里剔除的条目（正则匹配整行）。
 // ai-extra 来自 blackmatrix7 的 OpenAI/Gemini 规则集，会把「OpenAI 依赖的第三方服务」
-// 一并划给 AI 组。下面两条范围过宽：
+// 一并划给 AI 组。下面几条范围过宽：
 //   apis.google.com —— Google 登录/Drive/Firebase 都会走美国 AI 节点，应归「谷歌服务」
 //   IP-ASN,20473    —— 整个 Vultr ASN，所有托管在 Vultr 上按 IP 连接的服务都会进 AI 组
+//   第三方服务（stripe/sentry/auth0/intercom/algolia/identrust）
+//     —— 无数 App 共用，没理由固定走 AI 组（默认美国）。
+//        直接剔除，不额外指定策略，交给 GEOIP → FINAL → 漏网之鱼的默认路径
 const MERGE_DROP = {
-  'ai-extra': [/^DOMAIN-SUFFIX,apis\.google\.com$/i, /^IP-ASN,20473(,|$)/i],
+  'ai-extra': [
+    /^DOMAIN-SUFFIX,apis\.google\.com$/i,
+    /^IP-ASN,20473(,|$)/i,
+    /^DOMAIN-SUFFIX,(stripe\.com|sentry\.io|auth0\.com|intercom\.io|intercomcdn\.com|algolia\.net|identrust\.com)$/i,
+  ],
 };
 
 // 追加到 MERGE 输出的补充规则（原来 inline 在 config.conf 里）
