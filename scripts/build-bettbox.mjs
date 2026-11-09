@@ -6,7 +6,7 @@
  *   - 上游新增的开关/功能自动保留（不整份替换）
  *   - 必需补丁锚点找不到 → 直接报错退出，不产出坏脚本
  *
- * 用法: node build-bettbox-script.mjs [--check]
+ * 用法: node scripts/build-bettbox.mjs [--check]
  *   --check  只校验上游 + 锚点，不写文件
  */
 import fs from 'fs';
@@ -76,11 +76,7 @@ const REPLACES = [
     name: 'prefixRules 额外规则',
     required: true,
     from: `const prefixRules = [`,
-    to: `// ⚠️ 本文件由 build-bettbox-script.mjs 自动生成，不要手改
-// 上游: ${SRC}
-// 额外规则: bettbox/rules-extra.txt
-//
-// ⚠️ Bettbox 会用界面设置覆盖本脚本的同名键（源码 lib/state.dart buildPatchParams）：
+    to: `// ⚠️ Bettbox 会用界面设置覆盖本脚本的同名键（源码 lib/state.dart buildPatchParams）：
 //    find-process-mode / tun 整块 / mixed-port / ipv6 / external-controller / log-level
 //    → 这些在脚本里写了也不生效，必须在界面改
 //    dns 只在界面「覆写 DNS」开启时被覆盖；rules / proxy-groups 以脚本为准
@@ -247,6 +243,33 @@ Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
 
 const res = await fetch(SRC, { signal: AbortSignal.timeout(60000) });
 if (!res.ok) throw new Error(`${SRC} → HTTP ${res.status}`);
+
+// 上游版本指纹：raw.githubusercontent 的 ETag 是内容 sha256，上游一改就变。
+// 不额外发请求，也不受 API 限流影响。
+const upstreamEtag = (res.headers.get('etag') || '').replace(/^W\//, '').replace(/"/g, '');
+
+// 上游 commit（含日期）：尽力而为，失败只省略这一行，不影响构建。
+// CI 会传 GITHUB_TOKEN 避开未认证限流。
+let upstreamCommit = '';
+try {
+  const api = await fetch('https://api.github.com/repos/AIsouler/MyClash/commits/main', {
+    headers: {
+      accept: 'application/vnd.github+json',
+      'user-agent': 'sr-rules-build',
+      ...(process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (api.ok) {
+    const j = await api.json();
+    if (j?.sha && j?.commit?.committer?.date) {
+      upstreamCommit = `${j.sha.slice(0, 7)} @ ${j.commit.committer.date}`;
+    }
+  }
+} catch {
+  // 忽略：有 ETag 就能定位上游版本
+}
+
 let code = (await res.text()).replace(/\r\n/g, '\n');
 
 const report = [];
@@ -278,12 +301,34 @@ if (CHECK_ONLY) {
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 
-// 与已存在文件比对，无变化则不写（避免无意义提交）
+// ── 构建指纹横幅 ──────────────────────────────────────
+// 放在文件最顶端，便于出问题时一眼确认「这份是谁、哪天的、上游哪个版本」。
+// 关键：横幅里的生成日期只在内容真正变化时才刷新 —— 否则每日定时构建都会改文件，
+// 把「无意义提交」和「真实变更」混在一起。比对时先剥掉横幅再比正文。
+const BANNER_OPEN = '// ══════════ sr-rules 构建标记（自动生成，勿手改）══════════\n';
+const BANNER_CLOSE = '// ══════════ sr-rules 构建标记结束 ══════════\n';
+
+const stripBanner = (s) => {
+  if (!s.startsWith(BANNER_OPEN)) return s;
+  const end = s.indexOf(BANNER_CLOSE);
+  return end === -1 ? s : s.slice(end + BANNER_CLOSE.length);
+};
+
 const prev = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : null;
-if (prev === code) {
-  console.log('无变化');
+if (prev !== null && stripBanner(prev) === code) {
+  console.log('无变化（上游与本地补丁均未变）');
   process.exit(0);
 }
 
-fs.writeFileSync(OUT, code);
+const banner =
+  BANNER_OPEN +
+  `// 生成日期: ${new Date().toISOString().slice(0, 10)}\n` +
+  `// 上游脚本: ${SRC}\n` +
+  `// 上游版本: ${upstreamEtag ? `etag ${upstreamEtag.slice(0, 12)}…` : '未知'}\n` +
+  (upstreamCommit ? `// 上游提交: ${upstreamCommit}\n` : '') +
+  `// 本地输入: bettbox/rules-extra.txt, bettbox/custom-proxies.mjs\n` +
+  `// 重新生成: node scripts/build-bettbox.mjs\n` +
+  BANNER_CLOSE;
+
+fs.writeFileSync(OUT, banner + code);
 console.log(`已写入 ${OUT}`);

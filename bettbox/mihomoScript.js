@@ -1,3 +1,11 @@
+// ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
+// 生成日期: 2026-11-09
+// 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
+// 上游版本: etag 124acf9784b0…
+// 上游提交: 4a8f619 @ 2026-11-08T07:27:48Z
+// 本地输入: bettbox/rules-extra.txt, bettbox/custom-proxies.mjs
+// 重新生成: node scripts/build-bettbox.mjs
+// ══════════ sr-rules 构建标记结束 ══════════
 /**
  * mihomo配置覆写脚本（全量版）
  * 作者：AIsouler
@@ -63,10 +71,6 @@ const ruleOptionsEnable = {
 };
 
 // 定义前置规则
-// ⚠️ 本文件由 build-bettbox-script.mjs 自动生成，不要手改
-// 上游: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
-// 额外规则: bettbox/rules-extra.txt
-//
 // ⚠️ Bettbox 会用界面设置覆盖本脚本的同名键（源码 lib/state.dart buildPatchParams）：
 //    find-process-mode / tun 整块 / mixed-port / ipv6 / external-controller / log-level
 //    → 这些在脚本里写了也不生效，必须在界面改

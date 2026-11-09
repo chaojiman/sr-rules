@@ -32,6 +32,9 @@ jobs:
           node-version: '20'
 
       - name: 拉取上游并打补丁
+        env:
+          # 仅用于查询上游 commit 版本号（构建指纹），未认证会受 60 次/小时限流
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/build-bettbox.mjs
 
       - name: 校验配置与规则顺序

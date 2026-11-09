@@ -269,6 +269,11 @@ if (result && options) {
   const groupsByName = new Map(groups.map((group) => [group.name, group]));
   const indexOfRule = (rule) => rules.indexOf(rule);
 
+  // 构建指纹：出问题时必须能一眼确认「哪天的产物、上游哪个版本」
+  check(/^\/\/ ═+ sr-rules 构建标记/.test(bettboxCode), 'Bettbox 产物缺少 sr-rules 构建标记横幅');
+  check(/^\/\/ 生成日期: \d{4}-\d{2}-\d{2}$/m.test(bettboxCode), 'Bettbox 构建横幅缺少生成日期');
+  check(/^\/\/ 上游版本: \S/m.test(bettboxCode), 'Bettbox 构建横幅缺少上游版本（ETag）');
+
   const disabledServiceProviders = {
     Line: ['line'],
     PikPak: ['pikpak'],
