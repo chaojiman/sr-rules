@@ -107,12 +107,13 @@ const MERGE_GEOSITE = {
 };
 
 // 追加到 MERGE 输出的补充规则（原来 inline 在 config.conf 里）
+// 注：sharepoint.cn 不在内——它是世纪互联运营的国内版 SharePoint，
+// 走「微软服务」默认的 PROXY 会让上传下载绕行海外。交给 .cn 后缀直连。
 const MERGE_EXTRA = {
   onedrive: [
     'DOMAIN-SUFFIX,1drv.ms',
     'DOMAIN-SUFFIX,onedrive.co',
     'DOMAIN-SUFFIX,onedrive.eu',
-    'DOMAIN-SUFFIX,sharepoint.cn',
   ],
 };
 
@@ -211,6 +212,7 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
   let inRule = false;
   let domains = 0;
   let deadRules = 0;
+  let overbroad = 0;
   for (const raw of fs.readFileSync(DNS_MODULE, 'utf8').split('\n')) {
     const l = raw.trim();
     if (/^\[.+\]$/.test(l)) { inRule = l === '[Rule]'; continue; }
@@ -224,6 +226,12 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
     } else if (type === 'DOMAIN') {
       adsLines.push(value);
       domains++;
+    } else if (/DOMAIN-KEYWORD,volc\b/i.test(l)) {
+      // 上游用 DOMAIN-KEYWORD,volc 拦整个火山引擎域名族，只放过 2 个域名。
+      // 实测会把 ark.cn-beijing.volces.com（火山方舟/豆包 API）、
+      // www.volcengine.com、console.volcengine.com、volccdn.com 一并 REJECT。
+      // 广告子域已在 ads.list 里按具体域名拦截，这里整条丢掉。
+      overbroad++;
     } else if (/\b(USER-AGENT|URL-REGEX)\b/i.test(l)) {
       // MITM 默认关闭，HTTPS 流量看不到 User-Agent 和 URL 路径，这两类规则永远不命中。
       // 想让它们生效请装完整版 blockAds.srmodule，而不是把死规则留在配置里。
@@ -243,7 +251,8 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
     `ads-pattern ← 关键词 ${countBy(/^DOMAIN-KEYWORD,/i)} / ` +
       `逻辑 ${countBy(/^(AND|OR|NOT),/i)} / ` +
       `IP ${countBy(/^IP-CIDR6?,/i)}，共 ${extraArr.length} 条（RULE-SET）` +
-      (deadRules ? `；另剔除 MITM 死规则 ${deadRules} 条` : ''),
+      (deadRules ? `；另剔除 MITM 死规则 ${deadRules} 条` : '') +
+      (overbroad ? `；剔除过宽关键词规则 ${overbroad} 条` : ''),
   );
 }
 

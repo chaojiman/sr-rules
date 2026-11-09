@@ -2,7 +2,6 @@ DOMAIN-KEYWORD,-ad-sign.byteimg.com
 DOMAIN-KEYWORD,-tos.pstatp.com
 DOMAIN-KEYWORD,pangolin-sdk-toutiao
 DOMAIN-KEYWORD,pglstatp-toutiao
-AND,((NOT,((DOMAIN,volcengine-kdocs-cache.wpscdn.cn))),(NOT,((DOMAIN,vod-settings.volcvod.com))),(NOT,((DOMAIN,volcengine-kdocs-cache.wpscdn.cn))),(OR,((DOMAIN-KEYWORD,volc))))
 DOMAIN-KEYWORD,umeng
 DOMAIN-KEYWORD,adform
 DOMAIN-KEYWORD,dtscout
