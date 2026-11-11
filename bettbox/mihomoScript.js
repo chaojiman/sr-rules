@@ -1,5 +1,5 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
-// 生成日期: 2026-11-09
+// 生成日期: 2026-11-11
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
 // 上游版本: etag 124acf9784b0…
 // 上游提交: 4a8f619 @ 2026-11-08T07:27:48Z
@@ -81,7 +81,7 @@ const prefixRules = [
   'IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve',
   'DOMAIN-SUFFIX,ts.net,直连',
   'PROCESS-NAME,tailscaled.exe,直连',
-  'DOMAIN-SUFFIX,morphllm.com,美国',
+  'DOMAIN-SUFFIX,morphllm.com,AI',
   'PROCESS-PATH-REGEX,(?i)\\\\antigravity\\\\,AI',
   'DOMAIN,openai-api.arkoselabs.com,AI',
   'DOMAIN-SUFFIX,client-api.arkoselabs.com,AI',
