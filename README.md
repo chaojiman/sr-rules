@@ -289,10 +289,11 @@ DOMAIN-SET,.../finance.list,DIRECT
 > - **2026-11 清理两处历史残留**：① 删 `[Host]` 的 `*.apple.com` / `*.icloud.com = server:system`
 >   （`dns-direct-system = true` 后无实际作用）；② 删 `skip-proxy` 的银行三域名
 >   （该开关只在代理模式生效，TUN 下银行保护由 `finance.list` 承担）。
-> - **Bettbox DNS 同构升级（2026-11）**：`chinaDNS` 改为与 SR 相同的阿里×2 + DNSPod×1 全 IP 加密池，
->   DNS 块新增 `prefer-h3: true`（mihomo 无 `h3://` scheme，此开关等价）；
->   `defaultDNS` / `proxyServerDNS` 删明文 `114.114.114.114`（`hosts` 已钉 `doh.pub` 等域名，
->   引导解析不再需要它），至此两客户端 DNS 链路零明文。
+> - **Bettbox DNS 同构升级（2026-11）**：DNS 块新增 `prefer-h3: true`（mihomo 无 `h3://` scheme，此开关等价）；
+>   `chinaDNS` 改为 `['system', https://223.5.5.5/dns-query#DIRECT]` —— 直连域名走系统 DNS（等价 SR 的
+>   `dns-direct-system`，内核 ≥2024-04 自动排除 TUN 自身地址无回环），ISP CDN 同网调度最优；
+>   `defaultDNS` / `proxyServerDNS` 删明文 `114.114.114.114` 并统一为 443 端口 DoH
+>   （消灭 DoT 的 853 封锁风险，`doh.pub` 已被 hosts 钉死为 IP），至此两客户端 DNS 链路零明文。
 >
 > ⚠️ **`block-quic` 的默认值就是 `all-proxy`**。注释掉这一行等于回落默认值，**照样在拦**。
 > 要允许 HTTP/3 必须显式写 `block-quic = always-allow`。（踩过一次：注释后以为放开了，

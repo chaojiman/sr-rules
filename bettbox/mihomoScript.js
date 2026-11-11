@@ -1520,15 +1520,13 @@ const commonDnsRegex = new RegExp(
   'i',
 );
 
-// 国内外 DNS 定义（与小火箭同构：阿里×2 + DNSPod×1 全 IP 加密池，prefer-h3 全局启用 HTTP/3）
-const chinaDNS = [
-  'https://223.5.5.5/dns-query#DIRECT',
-  'https://223.6.6.6/dns-query#DIRECT',
-  'https://120.53.53.53/dns-query#DIRECT',
-];
+// 直连域名走系统 DNS（等价 SR 的 dns-direct-system）：内核 ≥2024-04 会自动排除 TUN 自身地址（如 198.18.0.2）无回环；
+// ISP UDP 竞速先回 → CDN 同网调度最优；DoH 仅作 system 失效（换网/未配 DNS）时的兑速兑底。
+// 节点池/引导池全部改用 443 端口 DoH（消灭 DoT 的 853 端口封锁风险），doh.pub 已被 hosts 钉死为 IP。
+const chinaDNS = ['system', 'https://223.5.5.5/dns-query#DIRECT'];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const defaultDNS = ['tls://223.5.5.5#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
-const proxyServerDNS = ['tls://223.5.5.5#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
+const defaultDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
+const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
 
 /**
  * hosts 匹配优先级：精确 > +. > . > *（同级按出现顺序）
