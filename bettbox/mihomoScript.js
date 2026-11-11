@@ -1520,11 +1520,15 @@ const commonDnsRegex = new RegExp(
   'i',
 );
 
-// 国内外 DNS 定义
-const chinaDNS = ['223.5.5.5#DIRECT', '119.29.29.29#DIRECT'];
+// 国内外 DNS 定义（与小火箭同构：阿里×2 + DNSPod×1 全 IP 加密池，prefer-h3 全局启用 HTTP/3）
+const chinaDNS = [
+  'https://223.5.5.5/dns-query#DIRECT',
+  'https://223.6.6.6/dns-query#DIRECT',
+  'https://120.53.53.53/dns-query#DIRECT',
+];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const defaultDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
-const proxyServerDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
+const defaultDNS = ['tls://223.5.5.5#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
+const proxyServerDNS = ['tls://223.5.5.5#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
 
 /**
  * hosts 匹配优先级：精确 > +. > . > *（同级按出现顺序）
@@ -1883,6 +1887,7 @@ function buildDnsAndHostsConfig(config, filteredProxies) {
   const dns = {
     enable: true,
     ipv6: true,
+    'prefer-h3': true,
     'use-hosts': true,
     'cache-algorithm': 'arc',
     'use-system-hosts': true,
