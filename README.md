@@ -286,6 +286,9 @@ DOMAIN-SET,.../finance.list,DIRECT
 >   零 UDP:443，cloudflare-quic.com 始终 HTTP/2。既然链路不支持，本地拒绝比放行更快。
 > - **`dns-direct-system` 改回 `true`**：直连域名回落运营商系统 DNS，抖音 CDN 同网调度实测明显更顺；
 >   加密池只服务规则表外需 GEOIP 判断的未知域名。
+> - **2026-11 清理两处历史残留**：① 删 `[Host]` 的 `*.apple.com` / `*.icloud.com = server:system`
+>   （`dns-direct-system = true` 后无实际作用）；② 删 `skip-proxy` 的银行三域名
+>   （该开关只在代理模式生效，TUN 下银行保护由 `finance.list` 承担）。
 >
 > ⚠️ **`block-quic` 的默认值就是 `all-proxy`**。注释掉这一行等于回落默认值，**照样在拦**。
 > 要允许 HTTP/3 必须显式写 `block-quic = always-allow`。（踩过一次：注释后以为放开了，
