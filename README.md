@@ -75,7 +75,7 @@ Bettbox  覆写 / 脚本 → 更新 → 重连（或重启内核）
 
 ```mermaid
 flowchart TD
-    A([发起请求]) --> B["DNS 解析<br/>阿里 / 腾讯 DoH<br/><b>全局只有一个 DNS</b>"]
+    A([发起请求]) --> B["DNS 解析<br/><b>仅 IP 规则需要真解析</b><br/>h3 阿里+DNSPod 加密池"]
     B --> C{"域名规则匹配<br/>从上往下，命中即停"}
 
     C -->|"① 广告规则<br/>adlite + ads.list"| R1[REJECT]
@@ -121,8 +121,8 @@ flowchart TD
 | | 小火箭 | Bettbox |
 | --- | --- | --- |
 | 本地 DNS 用途 | 真解析，结果参与分流判断 | 只发假 IP，不参与连接 |
-| DNS 服务器数量 | **全局一个**，无法按域名切换 | 按域名策略自动选（`nameserver-policy`） |
-| 境外域名解析 | 国内 DoH → **可能污染** | 节点侧解析 → 干净 |
+| DNS 服务器 | 按流量分两路：直连走系统 DNS（运营商，CDN 同网调度最优）；未知域名走 h3 加密池（阿里+DNSPod） | 按域名策略自动选（`nameserver-policy`） |
+| 境外域名解析 | 命中代理规则即远端解析，本地不问；仅未知域名需本地解析，靠规则顺序防污染 | 节点侧解析 → 干净 |
 | 防污染手段 | 靠规则顺序把域名挡在解析之前 | 架构层面免疫 |
 | 出问题的表现 | Load failed / 莫名走错出口 | 基本不会 |
 
@@ -269,20 +269,23 @@ DOMAIN-SET,.../finance.list,DIRECT
 | 开关 | 当前 | 作用 | 回滚 |
 | --- | --- | --- | --- |
 | `block-quic` | `all-proxy`（强制 TCP） | 本节点走不通 UDP 443：放行 QUIC 只会让客户端空等握手超时再降级；本地拒绝可立即回退 TCP | 改成 `always-allow` 即允许 HTTP/3 |
-| `dns-server` | 2 DoH + 2 UDP（`doh.pub` / `alidns` / `223.5.5.5` / `119.29.29.29`） | 多服务器并行查询取最快；明文 UDP 通常先返回，DoH 作为加密备选（与 LOWERTOP 的 lazy_group.conf 同组合） | 只留加密：`h3://223.5.5.5/dns-query, https://1.12.12.12/dns-query` |
-| `dns-direct-system` | `false`（直连也走 DNS 池） | 避免直连域名回落运营商系统 DNS；`[Host]` 已为 `*.apple.com` / `*.icloud.com` 保留系统解析 | 改回 `true` |
+| `dns-server` | 阿里 + DNSPod 双家加密池（`h3://223.5.5.5` / `https://223.6.6.6` / `h3://120.53.53.53`） | 并发竞速取最快，池内必须全加密——明文 UDP 必然先回，混入即等于没加密；全 IP 形式免域名引导解析；双运营商互为冗余，无需 fallback | 旧组合：`https://doh.pub/dns-query, https://dns.alidns.com/dns-query, 223.5.5.5, 119.29.29.29` |
+| `dns-direct-system` | `true`（直连走系统 DNS = 运营商） | 运营商 DNS 同网调度 CDN 最准；实测 `false`（直连也走 DoH 池）后抖音拖进度条变卡——阿里/腾讯 DoH 可能给出跨网节点 | 改 `false` |
 | `ipv6` | `true` | 本地 IPv6 不稳定时，AAAA 有结果但连不上会拖慢首次连接 | 改 `false` 试一天 |
 
 > 一次只改一个。已测过的结论：
 > - **L1 允许 HTTP/3（测速度）**：当时无体感差异，已回滚。
-> - **L2 DNS 只用明文 UDP**：有一点提升，保留为回退档。
-> - **L3 DNS 换 IP 版 DoH3 + DoH**：速度与 L2 持平，已改回 2 DoH + 2 UDP（取两者之长）。
-> - **`hijack-dns` 从 6 条精简到 2 条**：减少拦截判断。
+> - **L2 DNS 只用明文 UDP**：有一点提升，但明文查询可被看、可被改，已放弃。
+> - **L3 DNS 池只留加密选手（2026-11 转正）**：竞速模型下明文 UDP 必然先回，混入的 DoH 是陪跑；
+>   最终池 = 阿里 + DNSPod 双家 H3/DoH，全 IP 形式，双运营商互为冗余、无需 fallback。
+> - **`hijack-dns` 从 6 条精简到 2 条，又补回 4 条**：精简后硬编码 `1.1.1.1` 的 App
+>   会绕过 DNS 链明文泄漏，补回 `1.1.1.1:53` / `1.0.0.1:53`。
 > - **再次放开 QUIC**：目标不是速度，而是解决 App 切后台再回前台时
 >   连接复用失效（Gemini 卡住、消息发不出去）。
 > - **实测 QUIC 走不通，已改回 `all-proxy`**：21 分钟内 751 条 `:443` 连接全为 TCP，
 >   零 UDP:443，cloudflare-quic.com 始终 HTTP/2。既然链路不支持，本地拒绝比放行更快。
-> - **`dns-direct-system` 改为 `false`**：直连域名也走 DoH/UDP 池，不再回落运营商 DNS。
+> - **`dns-direct-system` 改回 `true`**：直连域名回落运营商系统 DNS，抖音 CDN 同网调度实测明显更顺；
+>   加密池只服务规则表外需 GEOIP 判断的未知域名。
 >
 > ⚠️ **`block-quic` 的默认值就是 `all-proxy`**。注释掉这一行等于回落默认值，**照样在拦**。
 > 要允许 HTTP/3 必须显式写 `block-quic = always-allow`。（踩过一次：注释后以为放开了，
