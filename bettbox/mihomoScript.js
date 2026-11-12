@@ -1,5 +1,5 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
-// 生成日期: 2026-11-11
+// 生成日期: 2026-11-12
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
 // 上游版本: etag 124acf9784b0…
 // 上游提交: 4a8f619 @ 2026-11-08T07:27:48Z
@@ -1520,13 +1520,11 @@ const commonDnsRegex = new RegExp(
   'i',
 );
 
-// 直连域名走系统 DNS（等价 SR 的 dns-direct-system）：内核 ≥2024-04 会自动排除 TUN 自身地址（如 198.18.0.2）无回环；
-// ISP UDP 竞速先回 → CDN 同网调度最优；DoH 仅作 system 失效（换网/未配 DNS）时的兑速兑底。
-// 节点池/引导池全部改用 443 端口 DoH（消灭 DoT 的 853 端口封锁风险），doh.pub 已被 hosts 钉死为 IP。
-const chinaDNS = ['system', 'https://223.5.5.5/dns-query#DIRECT'];
+// 国内外 DNS 定义
+const chinaDNS = ['223.5.5.5#DIRECT', '119.29.29.29#DIRECT'];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const defaultDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
-const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
+const defaultDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
+const proxyServerDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
 
 /**
  * hosts 匹配优先级：精确 > +. > . > *（同级按出现顺序）
@@ -1885,7 +1883,6 @@ function buildDnsAndHostsConfig(config, filteredProxies) {
   const dns = {
     enable: true,
     ipv6: true,
-    'prefer-h3': true,
     'use-hosts': true,
     'cache-algorithm': 'arc',
     'use-system-hosts': true,
