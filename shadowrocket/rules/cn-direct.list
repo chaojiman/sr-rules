@@ -804,7 +804,6 @@ DOMAIN-SUFFIX,zhimg.com
 IP-CIDR,103.41.167.226/32,no-resolve
 IP-CIDR,103.41.167.234/31,no-resolve
 IP-CIDR,103.41.167.236/32,no-resolve
-IP-CIDR,118.89.204.198/32,no-resolve
 IP-CIDR,2402:4e00:1200:ed00:0:9089:6dac:96b6/128,no-resolve
 DOMAIN-SUFFIX,001wifi.com
 DOMAIN-SUFFIX,1kapp.com
@@ -860,12 +859,8 @@ DOMAIN-SUFFIX,vshoucang.com
 DOMAIN-SUFFIX,wan68.com
 DOMAIN-SUFFIX,wapone.net
 DOMAIN-SUFFIX,wbimg.com
-DOMAIN-SUFFIX,weibo.tv
-DOMAIN-SUFFIX,weiboums.com
 DOMAIN-SUFFIX,xhaiwai.com
 DOMAIN-SUFFIX,xiaoka.tv
-DOMAIN-SUFFIX,weibo.com
-DOMAIN-SUFFIX,weibocdn.com
 DOMAIN-KEYWORD,weibo
 DOMAIN-SUFFIX,douban.com
 DOMAIN-SUFFIX,douban.fm
