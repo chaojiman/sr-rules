@@ -120,6 +120,11 @@ const MERGE_DROP = {
     /^IP-ASN,20473(,|$)/i,
     /^DOMAIN-SUFFIX,(stripe\.com|sentry\.io|auth0\.com|intercom\.io|intercomcdn\.com|algolia\.net|identrust\.com)$/i,
   ],
+  // smtcdns.net 是腾讯系 PCDN：config.conf 已在规则层 REJECT，
+  // 留在 bilibili.list 会让切港澳台节点的用户把 PCDN 流量送进代理
+  bilibili: [
+    /^DOMAIN-SUFFIX,smtcdns\.net$/i,
+  ],
 };
 
 // 追加到 MERGE 输出的补充规则（原来 inline 在 config.conf 里）
@@ -258,7 +263,23 @@ if (want('ads') && fs.existsSync(DNS_MODULE)) {
     }
   }
   const merged = dedupeDomainSet(adsLines);
-  const extraArr = [...extra];
+  let extraArr = [...extra];
+  // 剔除被同文件 DOMAIN-KEYWORD 吞噬的 AND 复合死规则：
+  // 规则自上而下命中即停，AND 里只要含某条更早 KEYWORD 的子串就永远轮不到（如 pglstatp-toutiao 系 5 条）
+  {
+    const kws = extraArr
+      .filter((l) => /^DOMAIN-KEYWORD,/i.test(l))
+      .map((l) => l.split(',')[1].toLowerCase());
+    const dead = extraArr.filter(
+      (l) => /^AND,/i.test(l) && kws.some((k) => l.toLowerCase().includes(k)),
+    );
+    if (dead.length) {
+      extraArr = extraArr.filter(
+        (l) => !(/^AND,/i.test(l) && kws.some((k) => l.toLowerCase().includes(k))),
+      );
+      console.log(`ads-pattern ← 剔除被 KEYWORD 吞噬的 AND 死规则 ${dead.length} 条`);
+    }
+  }
   fs.writeFileSync(adsPath, merged.join('\n') + '\n');
   fs.writeFileSync(path.join(OUT, 'ads-pattern.list'), extraArr.join('\n') + '\n');
   const countBy = (re) => extraArr.filter((l) => re.test(l)).length;
@@ -279,6 +300,8 @@ for (const [out, src] of Object.entries(GEOIP)) {
   for (const raw of txt.split('\n')) {
     const d = raw.trim();
     if (!d || d.startsWith('#')) continue;
+    // 100.64.0.0/10 = CGNAT + Tailscale 段，config.conf 顶部 TAILSCALE 规则专管，此处剔除防截胡
+    if (out === 'private-ip' && d === '100.64.0.0/10') continue;
     if (/^\d+\.\d+\.\d+\.\d+\/\d+$/.test(d)) lines.push(`IP-CIDR,${d}`);
     else if (d.includes(':') && d.includes('/')) lines.push(`IP-CIDR6,${d}`);
   }
@@ -363,6 +386,18 @@ for (const [out, paths] of Object.entries(MERGE)) {
   // 补充 inline 规则（如 onedrive 的 4 个域名）
   for (const l of MERGE_EXTRA[out] || []) set.add(l);
 
+  // 剔除被同组 DOMAIN-KEYWORD 覆盖的 DOMAIN-SUFFIX 冗余行（同组同策略，KEYWORD 子串匹配是超集）
+  const mergeKeywords = [...set]
+    .filter((l) => /^DOMAIN-KEYWORD,/i.test(l))
+    .map((l) => l.split(',')[1].toLowerCase());
+  let keywordCovered = 0;
+  for (const l of [...set]) {
+    const m = l.match(/^DOMAIN-SUFFIX,([^,]+)/i);
+    if (m && mergeKeywords.some((k) => m[1].toLowerCase().includes(k))) {
+      set.delete(l);
+      keywordCovered++;
+    }
+  }
   const lines = [...set];
   fs.writeFileSync(path.join(OUT, out + '.list'), lines.join('\n') + '\n');
   total += lines.length;
@@ -454,6 +489,18 @@ function classifyRuleLine(l) {
   return null;
 }
 
+// IPv4 CIDR 归一化到网络地址（203.107.1.1/24 → 203.107.1.0/24），供跨文件去重
+function normCidr(l) {
+  const m = l.match(/^IP-CIDR,(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})(,|$)/i);
+  if (!m || +m[2] > 32) return null;
+  const o = m[1].split('.').map(Number);
+  if (o.some((x) => x > 255)) return null;
+  const base = ((o[0] << 24) | (o[1] << 16) | (o[2] << 8) | o[3]) >>> 0;
+  const mask = +m[2];
+  const masked = mask === 0 ? 0 : (base & (0xffffffff << (32 - mask))) >>> 0;
+  return `${(masked >>> 24) & 255}.${(masked >>> 16) & 255}.${(masked >>> 8) & 255}.${masked & 255}/${mask}`;
+}
+
 function makeMatcher() {
   const exact = new Set();
   const suffix = new Set();
@@ -530,6 +577,7 @@ async function pruneShadowed() {
 
   // ② 裁剪：维护一个「已经命中过什么」的全局匹配器
   const gm = makeMatcher();
+  const seenCidr = new Set();
   const report = [];
   for (const item of model) {
     if (item.type === 'inline') {
@@ -548,6 +596,15 @@ async function pruneShadowed() {
       }
       const c = classifyRuleLine(t);
       if (!c) {
+        // IP-CIDR 跨文件去重：前面的规则集已声明同网段时，后面这条是永远命不中的死规则
+        const cidr = normCidr(t);
+        if (cidr) {
+          if (seenCidr.has(cidr)) {
+            removed++;
+            continue;
+          }
+          seenCidr.add(cidr);
+        }
         keepLines.push(raw);
         continue;
       }
