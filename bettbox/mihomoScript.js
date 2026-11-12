@@ -1521,10 +1521,14 @@ const commonDnsRegex = new RegExp(
 );
 
 // 国内外 DNS 定义
-const chinaDNS = ['223.5.5.5#DIRECT', '119.29.29.29#DIRECT'];
+// 对齐小火箭 dns-server 实测结论（2026-11-12）：
+// - chinaDNS 用 system（运营商本尊，CDN 同网就近）+ 阿里 DoH3 兜底加密
+// - defaultDNS 补 system：杂鱼域名明文换最快首查（与 SR 同一取舍），节点组保持全加密
+// - DoH 统一 #h3=true（HTTP/3 握手更快，443 端口不受歧视）；移除 114 明文与 tls:// 853 端口赌博
+const chinaDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT'];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const defaultDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
-const proxyServerDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
+const defaultDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
+const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://doh.pub/dns-query#DIRECT'];
 
 /**
  * hosts 匹配优先级：精确 > +. > . > *（同级按出现顺序）
