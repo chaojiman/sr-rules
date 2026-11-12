@@ -136,7 +136,7 @@ const excludeFilter =
 
 // 屏蔽代理QUIC流量
 const blockForeignQuic = [
-  'AND,((NETWORK,UDP),(DST-PORT,443),(NOT,((OR,((RULE-SET,cn),(RULE-SET,cn_ip,no-resolve)))))),REJECT',
+  'AND,((NETWORK,UDP),(DST-PORT,443),(NOT,((OR,((RULE-SET,geolocation-cn),(RULE-SET,cn_ip,no-resolve)))))),REJECT',
 ];
 
 // 直连节点
@@ -336,18 +336,6 @@ const baseRuleProviders = {
     url: `${ruleSetBaseUrl}geosite/fakeip-filter.mrs`,
     path: './ruleset/fakeip-filter.mrs',
     'path-in-bundle': 'geo/geosite/fakeip-filter.mrs',
-  },
-  cn: {
-    ...ruleProviderCommonDomain,
-    url: `${ruleSetBaseUrl}geosite/cn.mrs`,
-    path: './ruleset/cn.mrs',
-    'path-in-bundle': 'geo/geosite/cn.mrs',
-  },
-  douyin: {
-    ...ruleProviderCommonDomain,
-    url: `${ruleSetBaseUrl}geosite/douyin.mrs`,
-    path: './ruleset/douyin.mrs',
-    'path-in-bundle': 'geo/geosite/douyin.mrs',
   },
 };
 
@@ -1521,13 +1509,13 @@ const commonDnsRegex = new RegExp(
 );
 
 // 国内外 DNS 定义
-// 对齐小火箭 dns-server 实测结论（2026-11-12）：
-// - chinaDNS 用 system（运营商本尊，CDN 同网就近）+ 阿里 DoH3 兜底加密
-// - defaultDNS 补 system：杂鱼域名明文换最快首查（与 SR 同一取舍），节点组保持全加密
-// - DoH 统一 #h3=true（HTTP/3 握手更快，443 端口不受歧视）；移除 114 明文与 tls:// 853 端口赌博
-const chinaDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT'];
+// 对齐小火箭实测结论 + mihomo 内核字段职责（2026-11-12）：
+// - defaultDNS=default-nameserver：纯 IP 引导 DNS，仅用于解析 DoH 服务器自身域名，禁放 system/URL
+// - chinaDNS=nameserver：system 与 DoH 同组并发竞速（mihomo 无主备，system 恒抢先=明文换速度的既定取舍）
+// - proxyServerDNS 节点域名解析保持全加密，杜绝运营商 UDP 抢答污染
+const defaultDNS = ['223.5.5.5', '119.29.29.29'];
+const chinaDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const defaultDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
 const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://doh.pub/dns-query#DIRECT'];
 
 /**
@@ -1894,9 +1882,14 @@ function buildDnsAndHostsConfig(config, filteredProxies) {
     'fake-ip-range': '198.18.0.1/15',
     'fake-ip-range6': '2001:2::1/48',
     'fake-ip-filter': [
+      '+.ts.net',
       'rule-set:private',
       'rule-set:fakeip_filter',
-      'rule-set:cn',
+      'rule-set:geolocation-cn',
+      'rule-set:apple_cn',
+      'rule-set:microsoft_cn',
+      'rule-set:games_cn',
+      'rule-set:synology',
       ...(minimalModeEnabled ? [] : ruleOptionsEnable['FCM'] ? ['rule-set:googlefcm'] : []),
       ...proxyFakeIpFilter,
     ],
@@ -1905,11 +1898,17 @@ function buildDnsAndHostsConfig(config, filteredProxies) {
     ...(Object.keys(proxyServerPolicy).length > 0 && {
       'proxy-server-nameserver-policy': proxyServerPolicy,
     }),
-    nameserver: foreignDNS,
+    // 杂鱼域名由国内组本地毫秒级解析供 cn_ip 判定；已知国内外分别走策略组，杜绝绕道与泄露
+    nameserver: chinaDNS,
     'nameserver-policy': {
+      '+.ts.net': '100.100.100.100',
       'rule-set:private': 'system',
-      'rule-set:douyin': ['180.184.1.1', '180.184.2.2'],
-      'rule-set:cn': chinaDNS,
+      'rule-set:geolocation-!cn': foreignDNS,
+      'rule-set:geolocation-cn': chinaDNS,
+      'rule-set:apple_cn': chinaDNS,
+      'rule-set:microsoft_cn': chinaDNS,
+      'rule-set:games_cn': chinaDNS,
+      'rule-set:synology': chinaDNS,
     },
     'direct-nameserver': chinaDNS,
     'direct-nameserver-follow-policy': true,
