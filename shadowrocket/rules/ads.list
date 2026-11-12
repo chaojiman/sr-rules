@@ -1617,6 +1617,9 @@ app.biliapi.net
 .officesoftcn.com
 .photozoomchina.com
 .xitongqingli.com
+.apollo.caixin.com
+.logstat.caixin.com
+.promote.caixin.com
 dispatcher.360in.com
 exp.360in.com
 ad.chelaile.net.cn
@@ -1626,6 +1629,11 @@ data-hoisin.coocaa.com
 .gdyn.cnn.com
 .cnn.dyn.cnn.com
 .i.l.cnn.net
+.ad.csdn.net
+.counter.csdn.net
+.dc.csdn.net
+.dc2.csdn.net
+.medal.blog.csdn.net
 .a.dangdang.com
 .schprompt.dangdang.com
 .t.dangdang.com
@@ -2178,6 +2186,7 @@ wallpaper-1258344696.file.myqcloud.com
 .jebe.renren.com
 .sape.ru
 .ad.weshineapp.com
+.wxsnsdythumb.wxs.qq.com
 .ad.jiayuan.com
 analytics-api.smzdm.com
 dgstatic.jd.com
