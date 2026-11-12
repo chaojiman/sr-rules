@@ -12,6 +12,11 @@
 # 组名必须是：默认代理 / 直连 / 香港 / 日本 / 美国 / 新加坡 / 台湾 / 韩国 /
 #             GitHub / AI / Google / YouTube / Netflix ...
 
+# ===== 被拦截的国内站点（按域名强制走代理）=====
+# 16688.com.cn：国内 DNS 给联通山东 27.221.5.x，国内不可达；境外解析给香港 43.109.133.203（实测 200）
+# .cn 后缀命中「DOMAIN-SUFFIX,cn,直连」，所以必须显式前置到代理组
+DOMAIN-SUFFIX,16688.com.cn,默认代理
+
 # ===== Tailscale 内网直连 =====
 # 100.64.0.0/10      Tailscale IPv4 地址段（与运营商 CGNAT 共用，公网服务极少使用）
 # fd7a:115c:a1e0::/48 Tailscale IPv6 ULA 段

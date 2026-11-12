@@ -54,21 +54,45 @@ const REPLACES = [
   // ── 必需：规则顺序 AdBlock → GitHub → AI → 其余 ──
   // GitHub 在 AI 前：Copilot 全系自然归 GitHub，无需逐条钉规则
   // AI 在 Google 前：antigravity/gemini 的 *.googleapis.com 不会被 Google 抢走
+  // 上游 2026-11-12 起：AdBlock 标了 priority，规则走 priorityRules（插在 prefixRules 之前），
+  // 循环体改为 (svc.priority ? priorityRules : functionalRules).push(...)，原先的
+  // orderedServiceConfigs 已被上游删除。这里在同一循环里重建顺序并插入 .cn 兜底。
   {
-    name: '规则顺序 GitHub→AI',
+    name: '规则顺序 GitHub→AI + .cn 兜底',
     required: true,
-    from: `  const orderedServiceConfigs = [
+    from: `  for (const svc of serviceConfigs) {
+    if (!ruleOptionsEnable[svc.name]) continue;
+
+    (svc.priority ? priorityRules : functionalRules).push(...(svc.rules || []));
+    functionalIpRules.push(...(svc.ipRules || []));
+    Object.assign(finalRuleProviders, svc.providers || {});
+  }`,
+    to: `  // GitHub 在 AI 前：Copilot 全系自然归 GitHub，无需逐条钉规则
+  // AI 在 Google 前：antigravity/gemini 的 *.googleapis.com 不被 Google 抢走
+  const orderedServiceConfigs = [
     ...serviceConfigs.filter((svc) => svc.name === 'AdBlock'),
-    ...serviceConfigs.filter((svc) => svc.name !== 'AdBlock'),
-  ];`,
-    to: `  const orderedServiceConfigs = [
-    ...serviceConfigs.filter((svc) => svc.name === 'AdBlock'),
-    // GitHub 提前：Copilot 的 copilot* 域名在 AI 规则集里也有，GitHub 先命中即归 GitHub
     ...serviceConfigs.filter((svc) => svc.name === 'GitHub'),
-    // AI 提前：antigravity/gemini 的 *.googleapis.com 必须先于 Google 命中
     ...serviceConfigs.filter((svc) => svc.name === 'AI'),
-    ...serviceConfigs.filter((svc) => svc.name !== 'AdBlock' && svc.name !== 'GitHub' && svc.name !== 'AI'),
-  ];`,
+    ...serviceConfigs.filter((svc) => !['AdBlock', 'GitHub', 'AI'].includes(svc.name)),
+  ];
+  let cnFallbackInserted = false;
+  for (const svc of orderedServiceConfigs) {
+    // 去分组服务始终保留规则，出口已直接改写为默认代理或直连。
+    if (!INLINE_SERVICE_POLICIES[svc.name] && !ruleOptionsEnable[svc.name]) continue;
+
+    // .cn 不能放 prefixRules：否则会抢在 AdBlock 前放行 .cn 广告域名。
+    // 在首个非优先服务前插入，确保 AdBlock → GitHub → AI → .cn → 其余服务。
+    if (!['AdBlock', 'GitHub', 'AI'].includes(svc.name) && !cnFallbackInserted) {
+      // geolocation-cn 覆盖不到企业/地方 .cn 站点；域名匹配无需 DNS 解析
+      functionalRules.push('DOMAIN-SUFFIX,cn,直连');
+      cnFallbackInserted = true;
+    }
+    (svc.priority ? priorityRules : functionalRules).push(...(svc.rules || []));
+    functionalIpRules.push(...(svc.ipRules || []));
+    Object.assign(finalRuleProviders, svc.providers || {});
+  }
+  // 极端情况下上游只剩优先服务，也不能丢失 .cn 兜底。
+  if (!cnFallbackInserted) functionalRules.push('DOMAIN-SUFFIX,cn,直连');`,
   },
 
   // ── 必需：额外规则注入 ──
@@ -82,40 +106,6 @@ const REPLACES = [
 //    dns 只在界面「覆写 DNS」开启时被覆盖；rules / proxy-groups 以脚本为准
 const prefixRules = [
 ${extraBlock}`,
-  },
-
-  // ── 必需：.cn 兜底放在 AdBlock/GitHub/AI 后、其余服务前 ──
-  // geolocation-cn 等国内基础直连仍留在 prefixRules，避免误伤推送等功能域。
-  {
-    name: '.cn 后缀直连（广告/GitHub/AI 优先）',
-    required: true,
-    from: `  for (const svc of orderedServiceConfigs) {
-    if (!ruleOptionsEnable[svc.name]) continue;
-
-    functionalRules.push(...(svc.rules || []));
-    functionalIpRules.push(...(svc.ipRules || []));
-    Object.assign(finalRuleProviders, svc.providers || {});
-  }`,
-    to: `  let cnFallbackInserted = false;
-  for (const svc of orderedServiceConfigs) {
-    // .cn 不能放在 prefixRules：否则会抢在 AdBlock 前放行 .cn 广告域名。
-    // 在首个非优先服务前插入，确保 AdBlock → GitHub → AI → .cn → 其余服务。
-    if (!['AdBlock', 'GitHub', 'AI'].includes(svc.name) && !cnFallbackInserted) {
-      functionalRules.push(
-        // geolocation-cn 覆盖不到企业/地方 .cn 站点；域名匹配无需 DNS 解析
-        'DOMAIN-SUFFIX,cn,直连',
-      );
-      cnFallbackInserted = true;
-    }
-    // 去分组服务始终保留规则，出口已直接改写为默认代理或直连。
-    if (!INLINE_SERVICE_POLICIES[svc.name] && !ruleOptionsEnable[svc.name]) continue;
-
-    functionalRules.push(...(svc.rules || []));
-    functionalIpRules.push(...(svc.ipRules || []));
-    Object.assign(finalRuleProviders, svc.providers || {});
-  }
-  // 极端情况下上游只剩优先服务，也不能丢失 .cn 兜底。
-  if (!cnFallbackInserted) functionalRules.push('DOMAIN-SUFFIX,cn,直连');`,
   },
 
   // ── 必需：指定服务只保留规则，不生成独立 Selector / Bettbox 开关 ──
@@ -158,11 +148,11 @@ Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
     from: `  for (const svc of serviceConfigs) {
     if (!ruleOptionsEnable[svc.name]) continue;
 
-    let groupProxies = [];`,
+    const groupProxies = svc.includeAll`,
     to: `  for (const svc of serviceConfigs) {
     if (INLINE_SERVICE_POLICIES[svc.name] || !ruleOptionsEnable[svc.name]) continue;
 
-    let groupProxies = [];`,
+    const groupProxies = svc.includeAll`,
   },
 
   // ── 必需：自建节点注入（来自 bettbox/custom-proxies.mjs）──
@@ -171,6 +161,105 @@ Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
     required: true,
     from: `const customizeProxies = [];`,
     to: customProxiesBlock,
+  },
+
+  // ── 必需：DNS 常量（IP 引导 + system 竞速 + 节点组全加密）──
+  // 职责严格对齐 mihomo 内核：
+  //   default-nameserver  引导 DNS，只解析加密 DNS 自身域名，禁放 system/URL
+  //   nameserver          杂鱼域名本地解析（system 与 DoH 同组并发竞速，system 恒抢先）
+  //   proxy-server-nameserver  节点域名解析，全加密，避免运营商 UDP 抢答污染
+  {
+    name: 'DNS 常量：IP 引导 + system 竞速',
+    required: true,
+    from: `const chinaDNS = ['223.5.5.5#DIRECT', '119.29.29.29#DIRECT'];
+const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
+const defaultDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
+const proxyServerDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://doh.pub/dns-query#DIRECT'];`,
+    to: `// 对齐小火箭实测结论 + mihomo 字段职责：
+// - defaultDNS=default-nameserver：纯 IP 引导，仅解析 DoH 服务器自身域名，禁放 system/URL
+// - chinaDNS=nameserver：system 与 DoH 同组并发竞速（mihomo 无主备，system 恒抢先=明文换速度的既定取舍）
+// - proxyServerDNS 节点域名解析保持全加密，杜绝运营商 UDP 抢答污染
+const defaultDNS = ['223.5.5.5', '119.29.29.29'];
+const chinaDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];
+const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
+const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://doh.pub/dns-query#DIRECT'];`,
+  },
+
+  // ── 必需：DNS 对象（Fake-IP 过滤 + 国内优先解析 + Tailscale MagicDNS）──
+  {
+    name: 'DNS 对象：geolocation-cn 全家 + ts.net MagicDNS',
+    required: true,
+    from: `    'fake-ip-filter': [
+      'rule-set:private',
+      'rule-set:fakeip_filter',
+      'rule-set:cn',
+      ...(minimalModeEnabled ? [] : ruleOptionsEnable['FCM'] ? ['rule-set:googlefcm'] : []),
+      ...proxyFakeIpFilter,
+    ],
+    'default-nameserver': defaultDNS,
+    'proxy-server-nameserver': proxyServerDNS,
+    ...(Object.keys(proxyServerPolicy).length > 0 && {
+      'proxy-server-nameserver-policy': proxyServerPolicy,
+    }),
+    nameserver: foreignDNS,
+    'nameserver-policy': {
+      'rule-set:private': 'system',
+      'rule-set:douyin': ['180.184.1.1#DIRECT', '180.184.2.2#DIRECT'],
+      'rule-set:cn': chinaDNS,
+    },
+    'direct-nameserver': chinaDNS,
+    'direct-nameserver-follow-policy': true,`,
+    to: `    'fake-ip-filter': [
+      // Tailscale MagicDNS：不进 Fake-IP，否则短主机名解析失败
+      '+.ts.net',
+      'rule-set:private',
+      'rule-set:fakeip_filter',
+      // 用分流实际使用的 geolocation-cn 全家替换与规则集重复的 cn，
+      // 否则 apple_cn / games_cn 等国内域名会漏进 Fake-IP
+      'rule-set:geolocation-cn',
+      'rule-set:apple_cn',
+      'rule-set:microsoft_cn',
+      'rule-set:games_cn',
+      'rule-set:synology',
+      ...(minimalModeEnabled ? [] : ruleOptionsEnable['FCM'] ? ['rule-set:googlefcm'] : []),
+      ...proxyFakeIpFilter,
+    ],
+    'default-nameserver': defaultDNS,
+    'proxy-server-nameserver': proxyServerDNS,
+    ...(Object.keys(proxyServerPolicy).length > 0 && {
+      'proxy-server-nameserver-policy': proxyServerPolicy,
+    }),
+    // 杂鱼域名由国内组本地毫秒级解析供 cn_ip 判定；已知国内外分别走策略组，杜绝绕道与泄露
+    nameserver: chinaDNS,
+    'nameserver-policy': {
+      '+.ts.net': '100.100.100.100',
+      'rule-set:private': 'system',
+      'rule-set:geolocation-!cn': foreignDNS,
+      'rule-set:geolocation-cn': chinaDNS,
+      'rule-set:apple_cn': chinaDNS,
+      'rule-set:microsoft_cn': chinaDNS,
+      'rule-set:games_cn': chinaDNS,
+      'rule-set:synology': chinaDNS,
+    },
+    'direct-nameserver': chinaDNS,
+    'direct-nameserver-follow-policy': true,`,
+  },
+
+  // ── 必需：屏蔽代理 QUIC 的规则改指 geolocation-cn（cn 规则集已精简移除）──
+  {
+    name: 'QUIC 拦截改指 geolocation-cn',
+    required: true,
+    from: `(NOT,((OR,((RULE-SET,cn),(RULE-SET,cn_ip,no-resolve)))))`,
+    to: `(NOT,((OR,((RULE-SET,geolocation-cn),(RULE-SET,cn_ip,no-resolve)))))`,
+  },
+
+  // ── 必需：规则集精简（cn 与 geolocation-cn 重复；douyin 为明文 UDP 定向）──
+  // 用正则匹配，避免在模板字符串里出现反引号与 ${} 插值
+  {
+    name: '规则集精简：移除 cn / douyin',
+    required: true,
+    from: /  cn: \{\n    \.\.\.ruleProviderCommonDomain,\n    url: `[^`]*geosite\/cn\.mrs`,\n    path: '\.\/ruleset\/cn\.mrs',\n    'path-in-bundle': 'geo\/geosite\/cn\.mrs',\n  \},\n  douyin: \{\n    \.\.\.ruleProviderCommonDomain,\n    url: `[^`]*geosite\/douyin\.mrs`,\n    path: '\.\/ruleset\/douyin\.mrs',\n    'path-in-bundle': 'geo\/geosite\/douyin\.mrs',\n  \},\n/,
+    to: '',
   },
 
   // 注：上游 cn_ip / private_ip 本来就不带 no-resolve，无需补丁。

@@ -2,7 +2,8 @@ name: sync-bettbox
 
 on:
   schedule:
-    # UTC 20:00 = 北京时间 04:00
+    # 每天 UTC 20:00（北京 04:00）唤醒一次，由 gate 决定是否真的同步；
+    # 实际同步节奏为「距上次同步 ≥ 3 天」。cron 无法表达 n 天间隔，故用 gate 兜。
     - cron: '0 20 * * *'
   workflow_dispatch:
   push:
@@ -16,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: sync-bettbox
@@ -26,21 +28,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
+      # 定时触发时：距 bettbox/mihomoScript.js 上次提交不足 3 天就跳过；手动/推送触发不受限
+      - name: 判断是否到同步周期（每 3 天）
+        id: gate
+        if: github.event_name == 'schedule'
+        run: |
+          last=$(git log -1 --format=%ct -- bettbox/mihomoScript.js || echo 0)
+          now=$(date +%s)
+          days=$(( (now - last) / 86400 ))
+          echo "距上次同步 ${days} 天（阈值 3 天）"
+          if [ "$days" -ge 3 ]; then echo "due=true" >> "$GITHUB_OUTPUT"; else echo "due=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: 拉取上游并打补丁
+        if: github.event_name != 'schedule' || steps.gate.outputs.due == 'true'
         env:
           # 仅用于查询上游 commit 版本号（构建指纹），未认证会受 60 次/小时限流
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/build-bettbox.mjs
 
       - name: 校验配置与规则顺序
+        if: github.event_name != 'schedule' || steps.gate.outputs.due == 'true'
         run: node scripts/validate-configs.mjs
 
       - name: 提交变更
+        if: github.event_name != 'schedule' || steps.gate.outputs.due == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -51,3 +69,20 @@ jobs:
           fi
           git commit -m "chore: sync bettbox script $(date -u +%Y-%m-%d)"
           git push
+
+      # 失败兜底：上游结构变更会让必需锚点丢失，构建直接 exit 1（不会产出半成品）
+      - name: 失败通知（自动开 issue）
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="sync-bettbox 同步失败"
+          body=$(printf '%s
+'             "Bettbox 脚本同步失败。最常见原因：上游 AIsouler/MyClash 结构变更，导致 scripts/build-bettbox.mjs 的补丁锚点未命中。"             ""             "- 运行日志：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"             "- 失败时间：$(date -u '+%Y-%m-%d %H:%M UTC')"             "- 触发方式：${{ github.event_name }}"             ""             "## 处理步骤"             "1. 本地 git pull 后跑 node scripts/build-bettbox.mjs --check，看报告里哪条是「锚点未命中」"             "2. 对照上游 Script/mihomoScript.js 的实际代码，改 scripts/build-bettbox.mjs 里对应补丁的 from"             "3. 再跑一次 --check 全绿后提交 —— push 会自动触发一次完整构建"             ""             "在修好之前，定时任务每 3 天重试一次；构建失败不会覆盖现有 bettbox/mihomoScript.js。")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+            echo "已追加到既有 issue #$existing"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

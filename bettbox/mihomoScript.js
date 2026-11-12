@@ -1,8 +1,7 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
 // 生成日期: 2026-11-12
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
-// 上游版本: etag 124acf9784b0…
-// 上游提交: 4a8f619 @ 2026-11-08T07:27:48Z
+// 上游版本: etag dbc7dd1c073b…
 // 本地输入: bettbox/rules-extra.txt, bettbox/custom-proxies.mjs
 // 重新生成: node scripts/build-bettbox.mjs
 // ══════════ sr-rules 构建标记结束 ══════════
@@ -77,6 +76,7 @@ const ruleOptionsEnable = {
 //    dns 只在界面「覆写 DNS」开启时被覆盖；rules / proxy-groups 以脚本为准
 const prefixRules = [
   // ===== 额外规则（来自 bettbox/rules-extra.txt，勿直接改本文件）=====
+  'DOMAIN-SUFFIX,16688.com.cn,默认代理',
   'IP-CIDR,100.64.0.0/10,直连,no-resolve',
   'IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve',
   'DOMAIN-SUFFIX,ts.net,直连',
@@ -341,10 +341,8 @@ const baseRuleProviders = {
 
 // 策略组公共配置
 const groupBaseOption = {
-  interval: 600,
-  timeout: 3000,
+  timeout: 5000,
   url: 'https://www.apple.com/library/test/success.html',
-  lazy: true,
   'max-failed-times': 3,
   'empty-fallback': 'REJECT',
 };
@@ -359,6 +357,8 @@ const selectBaseOption = {
 const urlTestBaseOption = {
   ...groupBaseOption,
   type: 'url-test',
+  interval: 600,
+  lazy: true,
   tolerance: 50,
   'exclude-type': 'DIRECT',
   icon: `${iconBaseUrl}Auto.svg`,
@@ -369,6 +369,8 @@ const urlTestBaseOption = {
 const loadBalanceBaseOption = {
   ...groupBaseOption,
   type: 'load-balance',
+  interval: 600,
+  lazy: true,
   strategy: 'sticky-sessions',
   'exclude-type': 'DIRECT',
   icon: `${iconBaseUrl}RoundRobin.svg`,
@@ -791,6 +793,7 @@ const serviceConfigs = [
     name: 'AdBlock',
     baseOption: selectBaseOption,
     reject: true,
+    priority: true,
     providers: {
       'category-ads': {
         ...ruleProviderCommonDomain,
@@ -1009,16 +1012,16 @@ function createRegionGroup(name, icon, proxies) {
     const urlTestName = `${name}-自动选择`;
     return [
       {
-        ...urlTestBaseOption,
-        name: urlTestName,
-        proxies,
-      },
-      {
         ...selectBaseOption,
         name,
         icon,
         proxies: [...proxies, urlTestName],
         hidden: hideManualSelectGroupEnabled,
+      },
+      {
+        ...urlTestBaseOption,
+        name: urlTestName,
+        proxies,
       },
     ];
   }
@@ -1138,6 +1141,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   const functionalGroups = [];
   const functionalRules = [];
   const functionalIpRules = [];
+  const priorityRules = [];
   const finalRuleProviders = { ...baseRuleProviders };
 
   const { customProxyNames = [], customGroup = null } = customizeInfo || {};
@@ -1202,6 +1206,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
       functionalGroups: [defaultGroup, ...(autoSelectGroupEnabled ? [autoSelectGroup] : [])],
       functionalRules: [],
       functionalIpRules: [],
+      priorityRules: [],
       finalRuleProviders,
       chainGroup,
       directGroup,
@@ -1215,29 +1220,27 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
     icon: `${iconBaseUrl}Proxy.svg`,
   });
 
+  // GitHub 在 AI 前：Copilot 全系自然归 GitHub，无需逐条钉规则
+  // AI 在 Google 前：antigravity/gemini 的 *.googleapis.com 不被 Google 抢走
   const orderedServiceConfigs = [
     ...serviceConfigs.filter((svc) => svc.name === 'AdBlock'),
-    // GitHub 提前：Copilot 的 copilot* 域名在 AI 规则集里也有，GitHub 先命中即归 GitHub
     ...serviceConfigs.filter((svc) => svc.name === 'GitHub'),
-    // AI 提前：antigravity/gemini 的 *.googleapis.com 必须先于 Google 命中
     ...serviceConfigs.filter((svc) => svc.name === 'AI'),
-    ...serviceConfigs.filter((svc) => svc.name !== 'AdBlock' && svc.name !== 'GitHub' && svc.name !== 'AI'),
+    ...serviceConfigs.filter((svc) => !['AdBlock', 'GitHub', 'AI'].includes(svc.name)),
   ];
   let cnFallbackInserted = false;
   for (const svc of orderedServiceConfigs) {
-    // .cn 不能放在 prefixRules：否则会抢在 AdBlock 前放行 .cn 广告域名。
-    // 在首个非优先服务前插入，确保 AdBlock → GitHub → AI → .cn → 其余服务。
-    if (!['AdBlock', 'GitHub', 'AI'].includes(svc.name) && !cnFallbackInserted) {
-      functionalRules.push(
-        // geolocation-cn 覆盖不到企业/地方 .cn 站点；域名匹配无需 DNS 解析
-        'DOMAIN-SUFFIX,cn,直连',
-      );
-      cnFallbackInserted = true;
-    }
     // 去分组服务始终保留规则，出口已直接改写为默认代理或直连。
     if (!INLINE_SERVICE_POLICIES[svc.name] && !ruleOptionsEnable[svc.name]) continue;
 
-    functionalRules.push(...(svc.rules || []));
+    // .cn 不能放 prefixRules：否则会抢在 AdBlock 前放行 .cn 广告域名。
+    // 在首个非优先服务前插入，确保 AdBlock → GitHub → AI → .cn → 其余服务。
+    if (!['AdBlock', 'GitHub', 'AI'].includes(svc.name) && !cnFallbackInserted) {
+      // geolocation-cn 覆盖不到企业/地方 .cn 站点；域名匹配无需 DNS 解析
+      functionalRules.push('DOMAIN-SUFFIX,cn,直连');
+      cnFallbackInserted = true;
+    }
+    (svc.priority ? priorityRules : functionalRules).push(...(svc.rules || []));
     functionalIpRules.push(...(svc.ipRules || []));
     Object.assign(finalRuleProviders, svc.providers || {});
   }
@@ -1247,26 +1250,20 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   for (const svc of serviceConfigs) {
     if (INLINE_SERVICE_POLICIES[svc.name] || !ruleOptionsEnable[svc.name]) continue;
 
-    let groupProxies = [];
-    if (svc.includeAll) {
-      groupProxies = [...allProxiesNames];
-    } else if (svc.reject) {
-      groupProxies = ['REJECT', 'REJECT-DROP', 'PASS'];
-    } else {
-      groupProxies = !addAllNodesToServiceGroupsEnabled
-        ? ['默认代理', ...customGroupNames, ...baseGroupNames, ...groupNamesOfSelect, ...(svc.direct ? ['直连'] : [])]
+    const groupProxies = svc.includeAll
+      ? [...allProxiesNames]
+      : svc.reject
+        ? ['REJECT', 'REJECT-DROP', 'PASS']
         : [
             '默认代理',
             ...customGroupNames,
             ...baseGroupNames,
             ...groupNamesOfSelect,
-            ...allProxiesNames,
+            ...(addAllNodesToServiceGroupsEnabled ? allProxiesNames : []),
             ...(svc.direct ? ['直连'] : []),
           ];
-    }
 
-    const selected =
-      svc.defaultSelected !== undefined && groupProxies.includes(svc.defaultSelected) ? svc.defaultSelected : undefined;
+    const selected = groupProxies.includes(svc.defaultSelected) ? svc.defaultSelected : undefined;
 
     functionalGroups.push({
       ...svc.baseOption,
@@ -1310,6 +1307,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
     functionalGroups,
     functionalRules,
     functionalIpRules,
+    priorityRules,
     finalRuleProviders,
     chainGroup,
     directGroup,
@@ -1509,8 +1507,8 @@ const commonDnsRegex = new RegExp(
 );
 
 // 国内外 DNS 定义
-// 对齐小火箭实测结论 + mihomo 内核字段职责（2026-11-12）：
-// - defaultDNS=default-nameserver：纯 IP 引导 DNS，仅用于解析 DoH 服务器自身域名，禁放 system/URL
+// 对齐小火箭实测结论 + mihomo 字段职责：
+// - defaultDNS=default-nameserver：纯 IP 引导，仅解析 DoH 服务器自身域名，禁放 system/URL
 // - chinaDNS=nameserver：system 与 DoH 同组并发竞速（mihomo 无主备，system 恒抢先=明文换速度的既定取舍）
 // - proxyServerDNS 节点域名解析保持全加密，杜绝运营商 UDP 抢答污染
 const defaultDNS = ['223.5.5.5', '119.29.29.29'];
@@ -1882,9 +1880,12 @@ function buildDnsAndHostsConfig(config, filteredProxies) {
     'fake-ip-range': '198.18.0.1/15',
     'fake-ip-range6': '2001:2::1/48',
     'fake-ip-filter': [
+      // Tailscale MagicDNS：不进 Fake-IP，否则短主机名解析失败
       '+.ts.net',
       'rule-set:private',
       'rule-set:fakeip_filter',
+      // 用分流实际使用的 geolocation-cn 全家替换与规则集重复的 cn，
+      // 否则 apple_cn / games_cn 等国内域名会漏进 Fake-IP
       'rule-set:geolocation-cn',
       'rule-set:apple_cn',
       'rule-set:microsoft_cn',
@@ -1953,6 +1954,7 @@ function main(config) {
     functionalGroups,
     functionalRules,
     functionalIpRules,
+    priorityRules,
     finalRuleProviders,
     chainGroup,
     directGroup,
@@ -2012,15 +2014,14 @@ function main(config) {
   newConfig['rule-providers'] = finalRuleProviders;
 
   newConfig['rules'] = [
+    ...priorityRules,
     ...prefixRules,
     ...(ruleOptionsEnable.屏蔽代理QUIC流量 ? blockForeignQuic : []),
     ...functionalRules,
     'RULE-SET,geolocation-!cn,默认代理',
-    ...functionalIpRules,
-
-    // 兜底规则
     'RULE-SET,cn_ip,直连',
     'RULE-SET,private_ip,直连',
+    ...functionalIpRules,
     `MATCH,${ruleOptionsEnable.极简国内外分流模式 ? '默认代理' : '漏网之鱼'}`,
   ];
 
