@@ -3923,6 +3923,11 @@ http-response ^https:\/\/grpc\.biliapi\.net\/bilibili\.app\.(interface\.v1\.(Tee
 
 # >>>>>>>>>>>>>>> 🟣 <<<<<<<<<<<<<<
 [URL Rewrite]
+# > 菜鸟裹裹（sr-rules 自补）
+# hostname = cn-acs.m.cainiao.com, acs.m.taobao.com
+^https?:\/\/(cn-acs\.m\.cainiao\.com|acs\.m\.taobao\.com)\/gw\/mtop\.cainiao\.guoguo\.nbnetflow\.ads - reject
+^https?:\/\/(cn-acs\.m\.cainiao\.com|acs\.m\.taobao\.com)\/gw\/mtop\.cainiao\.adx\. - reject
+
 # >>>>>>>>>>>>>>> ✅ !! ✅ <<<<<<<<<<<<<<
 
 

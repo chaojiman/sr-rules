@@ -98,6 +98,21 @@ const EXTRA = [
 ];
 const JSON_EMPTY = ' data-type=text data="{}" status-code=200 header="Content-Type:application/json"';
 
+// ── 上游缺失的写法兜底（追加到 [URL Rewrite]）──────────
+// cn-acs 侧只有 Map Local（batch.show.v2|index）与 Script（m?show.cn）覆盖，
+// 菜鸟换接口名（v3 / splash）或改走 acs.m.taobao.com 网关时会全漏。
+// 两个域名都已在上游 MITM 列表里，直接按命名空间 reject，不依赖脚本分支。
+const URL_REWRITE_EXTRA = [
+  {
+    name: '菜鸟裹裹',
+    hosts: ['cn-acs.m.cainiao.com', 'acs.m.taobao.com'],
+    rules: [
+      '^https?:\\/\\/(cn-acs\\.m\\.cainiao\\.com|acs\\.m\\.taobao\\.com)\\/gw\\/mtop\\.cainiao\\.guoguo\\.nbnetflow\\.ads - reject',
+      '^https?:\\/\\/(cn-acs\\.m\\.cainiao\\.com|acs\\.m\\.taobao\\.com)\\/gw\\/mtop\\.cainiao\\.adx\\. - reject',
+    ],
+  },
+];
+
 // ── 规则改写（在剔除之后应用）──────────────────────────
 const REPLACES = [
   {
@@ -222,6 +237,13 @@ const timeoutStat = { 10: 0, 20: 0 };
           out.push('');
         }
       }
+      if (sec === 'URL Rewrite') {
+        for (const e of URL_REWRITE_EXTRA) {
+          out.push(`# > ${e.name}（sr-rules 自补）`, `# hostname = ${e.hosts.join(', ')}`);
+          for (const r of e.rules) out.push(r);
+          out.push('');
+        }
+      }
       continue;
     }
     if (/^# >>>/.test(line)) { name = ''; out.push(line); continue; }
@@ -264,6 +286,7 @@ for (const h of [...new Set(upstreamHosts)]) {
   keptHosts.push(h);
 }
 for (const h of EXTRA.flatMap((e) => e.hosts)) if (!keptHosts.includes(h)) keptHosts.push(h);
+for (const h of URL_REWRITE_EXTRA.flatMap((e) => e.hosts)) if (!keptHosts.includes(h)) keptHosts.push(h);
 out.push('[MITM]', `hostname = %APPEND% ${keptHosts.join(', ')}`, '');
 
 let result = out.join('\n');
