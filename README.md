@@ -207,8 +207,8 @@ flowchart TD
 
 | 模块 | 内容 | 性能 | 能拦什么 |
 | --- | --- | --- | --- |
-| [blockAds-dns.srmodule](adblock/blockAds-dns.srmodule) | 只有 `[Rule]` 段（2,267 条 REJECT），**无 MITM、无脚本** | **零开销**，等同于没装模块 | 独立广告域名、广告 SDK |
-| [blockAds.srmodule](adblock/blockAds.srmodule) | `[Rule]` + MITM 191 域名 + 94 条脚本 + 209 条 Map Local | **有开销**：命中域名要解密 + 缓冲整个响应体 + 跑 JS | 上面全部 + App 内开屏 / 信息流 / 弹窗 |
+| [blockAds-dns.srmodule](adblock/blockAds-dns.srmodule) | 只有 `[Rule]` 段（2,276 条 REJECT），**无 MITM、无脚本** | **零开销**，等同于没装模块 | 独立广告域名、广告 SDK |
+| [blockAds.srmodule](adblock/blockAds.srmodule) | MITM 202 域名 + 95 条脚本 + 171 条 Map Local + 153 条 Rewrite，**`[Rule]` 只留 12 条 QUIC** | **有开销**：命中域名要解密 + 缓冲整个响应体 + 跑 JS | 上面全部 + App 内开屏 / 信息流 / 弹窗 |
 
 **iOS 上打开网页明显变卡时，换 `-dns` 版。** 实测：完整版对 `www.baidu.com`、`www.zhihu.com`、
 `edith.xiaohongshu.com`、`mp.weixin.qq.com` 这类日常高频站做解密 + `requires-body` 缓冲，
@@ -220,12 +220,12 @@ flowchart TD
 
 | 部分 | 处理 |
 | --- | --- |
-| `[Rule]` DNS 拦截 | 全部保留（零风险），只剔金融段 |
+| `[Rule]` DNS 拦截 | **域名规则不进模块**：全部并进 config 的 `ads.list`（DOMAIN-SET 哈希查表）；模块里只留 12 条 QUIC。金融段照旧剔除 |
 | 解密规则（Rewrite / Map Local / Script） | 只保留 [`adblock/keep-apps.txt`](adblock/keep-apps.txt) 白名单里的 App |
 | `[MITM] hostname` | 只保留白名单 App 的域名，金融关键词兜底过滤 |
 | 金融类 App | 全部剔除（证书固定，解密即断网）；雪球/同花顺/天天基金例外。**段名要命中 `FIN_SECTION` 关键词**，`云闪付` 这种不含金融字样的段名需显式补进正则 |
 | 脚本超时 | 普通 10s，protobuf（binary-body-mode）20s，上游原为 60s |
-| QUIC | 抖音/淘宝/闲鱼/知乎/拼多多/B 站直连 QUIC 单独拦截，迫使走 TCP 才能去开屏 |
+| QUIC | 抖音/淘宝/菜鸟/闲鱼/知乎/小红书/拼多多/B 站直连 QUIC 单独拦截，迫使走 TCP 才能去开屏 |
 
 **新 App 想去广告**：在上游模块里搜 `# > App名`，把段名原样加进 `keep-apps.txt` 并提交，CI 自动重建。
 
@@ -246,13 +246,17 @@ DOMAIN-SET,.../finance.list,DIRECT
 > 为什么必须直连：银行看到海外机房 IP 会判定异常登录，触发验证码、短信、
 > 甚至临时冻结。这类风控比被解密更隐蔽，因为你可能只偶尔遇到「登录异常」。
 
-> ⚠️ **模块 `[Rule]` 优先于 `config.conf`**（与配置内的顺序无关）。模块里的 `REJECT` 会盖掉配置里的 `DIRECT`，
-> 所以在 `config.conf` 里补一条 `DOMAIN-SUFFIX,xxx,DIRECT` **救不了**被模块误伤的域名 —— 只能改构建脚本
-> 或关掉模块。
+> ⚠️ **模块 `[Rule]` 优先于 `config.conf`**（与配置内的顺序无关）。但模块 `[Rule]` 现在**只剩 12 条 QUIC**，
+> 广告域名 REJECT 全部在 config 的 `ads.list`（第 1 段），所以误伤可以直接在配置里修：
+> 把 `DOMAIN-SUFFIX,xxx,DIRECT` 写在广告 `DOMAIN-SET` **之前**即可。
 >
-> 已踩过：`# > 云闪付` 段的 `switch.cup.com.cn`（活动开关下发）、`tysdk.95516.com`、`ads.cup.com.cn`
+> 历史踩坑（当时域名规则还在模块里，配置补 DIRECT 救不了）：
+> `# > 云闪付` 段的 `switch.cup.com.cn`（活动开关下发）、`tysdk.95516.com`、`ads.cup.com.cn`
 > 被 REJECT，云闪付活动区空白。该段名不含「银联 / 支付」等关键词，金融剔除逻辑没拦住，
-> 而 `[Rule]` 是「全部保留」，于是整段生效。
+> 而当时 `[Rule]` 是「全部保留」，于是整段生效。
+>
+> 为什么把域名规则从模块挪走：模块规则插在 config 之前，**每个请求都要线性扫 2,961 条**；
+> 而 config 里的 `DOMAIN-SET` 是哈希查表。挪走后模块 `[Rule]` 只剩 12 条 QUIC。
 
 **出问题怎么回滚**：
 

@@ -80,7 +80,7 @@ const DOMAIN_PATTERNS = [
 // ── 直连 App 的 QUIC 拦截 ─────────────────────────────
 // 配置里 block-quic = all-proxy 只拦代理流量；这些国内 App 直连走 QUIC 时
 // 绕过 MITM，开屏/信息流去不掉。只拦这几个域名，不动全局。
-const QUIC_BLOCK = ['amemv.com', 'snssdk.com', 'taobao.com', 'cainiao.com', 'goofish.com', 'zhihu.com', 'pinduoduo.com', 'yangkeduo.com', 'bilibili.com', 'biliapi.net', 'hongyibo.com.cn'];
+const QUIC_BLOCK = ['amemv.com', 'snssdk.com', 'taobao.com', 'cainiao.com', 'goofish.com', 'zhihu.com', 'pinduoduo.com', 'yangkeduo.com', 'bilibili.com', 'biliapi.net', 'hongyibo.com.cn', 'xiaohongshu.com'];
 
 // ── 上游缺失的 App，自补规则（追加到 [Map Local]）──────────
 // 酷狗概念版：来源 luestr「酷狗概念版去广告」，只取广告/开屏接口；
@@ -209,6 +209,10 @@ let upstreamHosts = [];
 
 // ── 第二遍：按段裁剪 ─────────────────────────────────
 const out = [];
+// 上游 [Rule] 完整内容（剔金融后），只给 blockAds-dns.srmodule 用。
+// 完整模块的 [Rule] 只留 QUIC——域名规则已并入 config 的 ads.list（DOMAIN-SET 哈希查表），
+// 留在模块里等于每个请求先线性扫 2,961 条。
+const ruleLines = [];
 const seenSections = new Set();
 const keptMitmSections = new Set();
 const droppedFin = new Set();
@@ -224,12 +228,18 @@ const timeoutStat = { 10: 0, 20: 0 };
       sec = m[1];
       name = '';
       if (sec === 'MITM') break; // MITM 段末尾单独重建
-      out.push(line);
       if (sec === 'Rule') {
-        out.push('# > QUIC 拦截（sr-rules 追加：直连 App 回退 TCP，MITM 才能生效）');
-        for (const d of QUIC_BLOCK) out.push(`AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,${d})),REJECT`);
+        ruleLines.push(line, '# > QUIC 拦截（sr-rules 追加：直连 App 回退 TCP，MITM 才能生效）');
+        out.push(line, '# > QUIC 拦截（sr-rules 追加：直连 App 回退 TCP，MITM 才能生效）');
+        for (const d of QUIC_BLOCK) {
+          const q = `AND,((PROTOCOL,QUIC),(DOMAIN-SUFFIX,${d})),REJECT`;
+          out.push(q);
+          ruleLines.push(q);
+        }
         out.push('');
+        continue;
       }
+      out.push(line);
       if (sec === 'Map Local') {
         for (const e of EXTRA) {
           out.push(`# > ${e.name}（sr-rules 自补）`, `# hostname = ${e.hosts.join(', ')}`);
@@ -246,7 +256,7 @@ const timeoutStat = { 10: 0, 20: 0 };
       }
       continue;
     }
-    if (/^# >>>/.test(line)) { name = ''; out.push(line); continue; }
+    if (/^# >>>/.test(line)) { name = ''; (sec === 'Rule' ? ruleLines : out).push(line); continue; }
     if ((m = line.match(/^# > (.+)/))) name = m[1].trim();
 
     const inMitm = MITM_SECS.has(sec);
@@ -254,6 +264,15 @@ const timeoutStat = { 10: 0, 20: 0 };
 
     // 金融段：所有分区一律删除（FIN_ALLOW 除外）
     if (name && isFinSection(name)) { droppedFin.add(name); continue; }
+    // [Rule] 段只收集不输出（完整模块只留 QUIC + MITM 专属类型）
+    if (sec === 'Rule') {
+      ruleLines.push(line);
+      const t = line.trim();
+      // URL-REGEX / USER-AGENT（含嵌在 AND 里的）依赖 MITM 明文，dns 版会过滤掉，
+      // 只能留在模块里；数量 17 条，线性扫描开销可忽略。
+      if (t && !t.startsWith('#') && /\b(USER-AGENT|URL-REGEX)\b/i.test(t)) out.push(line);
+      continue;
+    }
 
     if (inMitm) {
       const isRule = line.trim() && !line.startsWith('#');
@@ -381,6 +400,26 @@ const blockedLeft = keptHosts.filter(isBlockedHost);
 if (blockedLeft.length) errors.push(`豁免域名残留：${blockedLeft.join(', ')}`);
 if (keptHosts.length < 50) errors.push(`MITM 域名只剩 ${keptHosts.length} 个，上游结构可能已变`);
 if (/^[^#\n].*timeout=60\b/m.test(result)) errors.push('仍有 timeout=60 的脚本');
+// 完整模块的 [Rule] 只剩 QUIC（域名规则已交给 config），所以要保证上游自带的 QUIC
+// 域名全部在 QUIC_BLOCK 里，否则会静默丢失
+const upstreamQuic = [
+  ...new Set(
+    lines
+      .filter((l) => /^AND,\(\(PROTOCOL,QUIC\)/i.test(l.trim()))
+      .map((l) => (l.match(/DOMAIN-SUFFIX,([^)]+)/) || [])[1])
+      .filter(Boolean),
+  ),
+];
+const missingQuic = upstreamQuic.filter((d) => !QUIC_BLOCK.includes(d));
+if (missingQuic.length) errors.push(`上游 QUIC 域名未纳入 QUIC_BLOCK：${missingQuic.join(', ')}`);
+// URL-REGEX / USER-AGENT 依赖 MITM 明文，dns 版会丢，必须留在模块 [Rule] 里
+const upstreamMitmOnly = lines.filter((l) => /^[^#\n]/.test(l.trim()) && /\b(USER-AGENT|URL-REGEX)\b/i.test(l)).length;
+const keptMitmOnly = result
+  .split('\n')
+  .filter((l) => /^[^#\n]/.test(l.trim()) && /\b(USER-AGENT|URL-REGEX)\b/i.test(l)).length;
+if (keptMitmOnly < upstreamMitmOnly) {
+  errors.push(`URL-REGEX/USER-AGENT 规则丢失：上游 ${upstreamMitmOnly} 条 → 模块 ${keptMitmOnly} 条`);
+}
 if (errors.length) {
   console.error('❌ 断言失败：\n  ' + errors.join('\n  '));
   process.exit(1);
@@ -395,15 +434,13 @@ if (CHECK_ONLY) {
 // 背景：MITM 191 个域名 + 94 条 requires-body 脚本会让日常高频站（百度/知乎/小红书/
 // 微信/携程…）每次请求都经历「解密 → 缓冲整个响应体 → 跑 JS → 重加密」，实测明显卡顿。
 // 这个版本只保留 DNS 层 REJECT，零解密、零脚本，性能开销等同于没有模块。
-function buildDnsOnly(full) {
+function buildDnsOnly(full, ruleLines) {
   const fl = full.split('\n');
   const firstSec = fl.findIndex((l) => /^\[.+\]$/.test(l.trim()));
   const header = fl.slice(0, firstSec < 0 ? 0 : firstSec);
-  const s = fl.findIndex((l) => l.trim() === '[Rule]');
-  if (s < 0) throw new Error('未找到 [Rule] 段，无法生成零解密版');
-  const e = fl.findIndex((l, i) => i > s && /^\[.+\]$/.test(l.trim()));
+  if (!ruleLines.length) throw new Error('未收集到 [Rule] 段，无法生成零解密版');
   const isStruct = (t) => !t || t.startsWith('#') || /^\[.+\]$/.test(t);
-  const raw = fl.slice(s, e < 0 ? fl.length : e);
+  const raw = ruleLines;
 
   // 1) 无 MITM 时永远不命中：
   //  - AND,((PROTOCOL,QUIC),...) 原本是「迫使走 TCP 才能 MITM」，没有 MITM 就只剩降速
@@ -463,7 +500,7 @@ function buildDnsOnly(full) {
   return { text, stats };
 }
 
-const { text: dnsResult, stats: dnsStats } = buildDnsOnly(result);
+const { text: dnsResult, stats: dnsStats } = buildDnsOnly(result, ruleLines);
 const dnsRuleCount = dnsResult.split('\n').filter((l) => l.trim() && !l.trim().startsWith('#') && !/^\[.+\]$/.test(l.trim())).length;
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
