@@ -80,7 +80,7 @@ const DOMAIN_PATTERNS = [
 // ── 直连 App 的 QUIC 拦截 ─────────────────────────────
 // 配置里 block-quic = all-proxy 只拦代理流量；这些国内 App 直连走 QUIC 时
 // 绕过 MITM，开屏/信息流去不掉。只拦这几个域名，不动全局。
-const QUIC_BLOCK = ['amemv.com', 'snssdk.com', 'taobao.com', 'goofish.com', 'zhihu.com', 'pinduoduo.com', 'yangkeduo.com', 'bilibili.com', 'biliapi.net', 'hongyibo.com.cn'];
+const QUIC_BLOCK = ['amemv.com', 'snssdk.com', 'taobao.com', 'cainiao.com', 'goofish.com', 'zhihu.com', 'pinduoduo.com', 'yangkeduo.com', 'bilibili.com', 'biliapi.net', 'hongyibo.com.cn'];
 
 // ── 上游缺失的 App，自补规则（追加到 [Map Local]）──────────
 // 酷狗概念版：来源 luestr「酷狗概念版去广告」，只取广告/开屏接口；
