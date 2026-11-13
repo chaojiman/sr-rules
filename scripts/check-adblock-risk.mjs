@@ -38,6 +38,18 @@ const CRITICAL = /(version|update|login|auth|token|signin|register|bootstrap|app
 // 次要接口：多半是广告/实验配置，误报率高
 const MAYBE = /(config|init|launch|start|home|index)/i;
 
+// 只对规则里的 URL 做关键词判断。
+// 之前用整行文本匹配，Body Rewrite 的 jq 替换体里出现的字段名
+// （如 B 站 account/mine 的 need_login）会被误判成关键接口。
+const urlOf = (line) => {
+  const p = line.match(/pattern=(\S+?)(?=[,\s]|$)/);
+  if (p) return p[1];
+  // 规则行有两种写法：`^https?:\/\/... data-type=...`（URL 在首位）
+  // 与 `http-response-jq ^https?:\/\/... '...'`（URL 在指令之后）
+  const tok = line.split(/\s+/).find((t) => /^\^?https?:/i.test(t));
+  return tok || line;
+};
+
 const findings = [];
 
 for (const sec of ['URL Rewrite', 'Map Local', 'Script', 'Body Rewrite']) {
@@ -65,8 +77,8 @@ for (const sec of ['URL Rewrite', 'Map Local', 'Script', 'Body Rewrite']) {
     const mainHosts = hosts.filter(isMainApi);
     if (!mainHosts.length) continue;
 
-    const critical = CRITICAL.test(l);
-    const maybe = !critical && MAYBE.test(l);
+    const critical = CRITICAL.test(urlOf(l));
+    const maybe = !critical && MAYBE.test(urlOf(l));
     findings.push({
       level: critical ? '🔴' : maybe ? '🟡' : '⚪',
       app,

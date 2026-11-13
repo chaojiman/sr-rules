@@ -109,6 +109,41 @@ const REPLACES = [
   },
 ];
 
+// ── 精准剔除（按子串匹配，避免正则转义陷阱）──────────────
+// 有道的 cdke/course3/recommend/dict/startup 是「课程推荐」启动接口，
+// 整体返回 {} 会让 App 启动白屏，风险扫描标为高危。
+// 收窄为不拦该启动接口，只保留该 App 的纯广告位（dsp-impr2 / impservice / oral）。
+const DROP_LINES = [
+  {
+    name: '有道不再整包置空课程推荐启动接口',
+    match: 'cdke\\.youdao\\.com\\/course3\\/recommend\\/dict\\/startup',
+  },
+];
+
+// ── 脚本锁定到 commit SHA ──────────────────────────
+// script-path 指向 raw.githubusercontent.com/{owner}/{repo}/{branch}/...
+// 小火箭每次拉脚本都走分支头，上游半夜改坏脚本会立刻在手机上执行，
+// 而模块要等次日 CI 才重建。锁定 SHA 后，脚本只在「模块重建 + 手机更新模块」时变化。
+// 覆盖 fmz200 与 8 个第三方仓库；查询失败时回退原 URL 并告警，不阻断构建
+// （阻断会导致模块停在旧版，旧脚本仍在跑，反而更差）。
+const SHA_CACHE = new Map();
+async function resolveSha(owner, repo, branch) {
+  const key = `${owner}/${repo}@${branch}`;
+  if (SHA_CACHE.has(key)) return SHA_CACHE.get(key);
+  let sha = null;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, {
+      headers: { 'User-Agent': 'sr-rules-build', Accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.ok) sha = (await res.json()).sha || null;
+  } catch {
+    sha = null;
+  }
+  SHA_CACHE.set(key, sha);
+  return sha;
+}
+
 const MITM_SECS = new Set(['Header Rewrite', 'URL Rewrite', 'Body Rewrite', 'Map Local', 'Script']);
 const cleanHost = (h) => h.trim().replace(/hostname$/i, '');
 // [Rule] 段里出现银联/云闪付域名的段，即使段名不含金融字样也按金融段处理（段名被上游改掉时的兜底）
@@ -243,6 +278,53 @@ for (const p of REPLACES) {
   repReport.push(`✅ ${p.name}`);
 }
 
+// ── 精准剔除高危接口（在改写之后应用）──────────────
+for (const d of DROP_LINES) {
+  const before = result.split('\n');
+  const kept = before.filter((l) => l.trim().startsWith('#') || !l.includes(d.match));
+  const n = before.length - kept.length;
+  result = kept.join('\n');
+  repReport.push(`${n ? '✅' : '⚠️ '} ${d.name} —— 剔除 ${n} 条`);
+}
+
+// ── 脚本锁定 SHA ─────────────────────────────────
+const pinStats = { total: 0, pinned: 0, already: 0, failed: [] };
+// 两种写法都要认：raw.githubusercontent.com/{o}/{r}/{ref}/...
+// 以及 github.com/{o}/{r}/raw/{ref}/...（上游混用）
+const parseScriptUrl = (url) => {
+  let m = url.match(/^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/(?:refs\/heads\/)?([^/]+)\/(.+)$/);
+  if (m) return { host: 'raw', owner: m[1], repo: m[2], ref: m[3], rest: m[4] };
+  m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/raw\/(?:refs\/heads\/)?([^/]+)\/(.+)$/);
+  if (m) return { host: 'gh', owner: m[1], repo: m[2], ref: m[3], rest: m[4] };
+  return null;
+};
+const pinTargets = [...new Set(result.match(/script-path=\S+?(?=[,\s]|$)/g) || [])];
+for (const decl of pinTargets) {
+  const url = decl.slice('script-path='.length);
+  const parsed = parseScriptUrl(url);
+  if (!parsed) {
+    pinStats.failed.push(url);
+    continue;
+  }
+  const { host, owner, repo, ref, rest } = parsed;
+  pinStats.total++;
+  if (/^[0-9a-f]{40}$/.test(ref)) {
+    pinStats.already++;
+    continue;
+  }
+  const sha = await resolveSha(owner, repo, ref);
+  if (!sha) {
+    pinStats.failed.push(url);
+    continue;
+  }
+  const base =
+    host === 'gh'
+      ? `https://github.com/${owner}/${repo}/raw`
+      : `https://raw.githubusercontent.com/${owner}/${repo}`;
+  result = result.split(decl).join(`script-path=${base}/${sha}/${rest}`);
+  pinStats.pinned++;
+}
+
 // 头部改写：指向自己的仓库，避免「检查更新」跳回上游
 result = result
   .replace(/^#!name=.*/m, '#!name=广告拦截(自用白名单版)')
@@ -260,6 +342,10 @@ console.log(`MITM 域名 ${upstreamHosts.length} → ${keptHosts.length}（非�
 if (removed.fin.size) console.log(`  金融域名：${[...removed.fin].join(', ')}`);
 console.log(`Script 超时：10s × ${timeoutStat[10]}，20s × ${timeoutStat[20]}`);
 console.log(repReport.join('\n'));
+console.log(
+  `脚本锁定：${pinStats.pinned} 个 → SHA，已锁定 ${pinStats.already}，失败 ${pinStats.failed.length}`,
+);
+if (pinStats.failed.length) console.log(`⚠️  未能锁定的脚本（回落分支头）：\n  ${pinStats.failed.join('\n  ')}`);
 if (missing.length) console.log(`⚠️  白名单中上游不存在的段名：${missing.join('、')}`);
 
 // ── 断言 ─────────────────────────────────────────────
