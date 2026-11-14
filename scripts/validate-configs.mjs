@@ -381,13 +381,17 @@ if (result && options) {
   // 自建节点必须来自 bettbox/custom-proxies.mjs（否则每日同步会丢）
   const customMod = await import(pathToFileURL(resolveInside('bettbox/custom-proxies.mjs')).href);
   const expectedCustom = Array.isArray(customMod.default) ? customMod.default : [];
-  const generatedNames = new Set((result.proxies || []).map((item) => item.name));
+  const generatedNames = [...((result.proxies || []).map((item) => item.name).filter(Boolean))];
+  const hasName = (name) => generatedNames.some((n) => n === name || n.endsWith(name));
   for (const node of expectedCustom) {
-    check(node?.name && generatedNames.has(node.name), `Bettbox 自建节点未被注入：${node?.name || '(缺 name)'}`);
+    check(node?.name && hasName(node.name), `Bettbox 自建节点未被注入：${node?.name || '(缺 name)'}`);
   }
   if (options.链式代理) {
     for (const node of expectedCustom) {
-      const built = (result.proxies || []).find((item) => item.name === node.name);
+      // normalizeProxyName 会按地区补国旗/前缀，产物名可能与声明名不同，按后缀匹配兜住
+      const built = (result.proxies || []).find(
+        (item) => item.name === node.name || (item.name || '').endsWith(node.name),
+      );
       check(built?.['dialer-proxy'] === '链式中转', `链式代理已开，但 ${node.name} 缺少 dialer-proxy`);
     }
   }
