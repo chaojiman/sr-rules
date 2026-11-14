@@ -1052,7 +1052,9 @@ function buildRegionGroups(filteredProxies, customProxies) {
   const regionGroups = Object.fromEntries(allRegionDefinitions.map(({ name }) => [name, []]));
   const otherProxies = [];
 
-  for (const proxy of [...filteredProxies, ...customProxies]) {
+  // 自建/落地节点只出现在「链式落地」组：它们自带 dialer-proxy，
+  // 若被塞进地区组，选「美国」时可能选中「落地-美国」，导致请求全部走链式而失效。
+  for (const proxy of [...filteredProxies]) {
     const matchedRegions = getMatchedRegions(proxy.name);
     const isRegionProxy = matchedRegions.some((region) => regionDefinitions.includes(region));
 

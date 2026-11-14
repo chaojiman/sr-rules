@@ -302,6 +302,16 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://d
     ? [{ name: '链式代理=开', required: false, from: /^(\s*)链式代理:\s*false,/m, to: '$1链式代理: true,' }]
     : []),
 
+  // ── 自建落地节点不参与地区分组（否则会混进「美国」「香港」等地区组，被误选成出口）──
+  {
+    name: '落地节点不进地区组',
+    required: false,
+    from: `  for (const proxy of [...filteredProxies, ...customProxies]) {`,
+    to: `  // 自建/落地节点只出现在「链式落地」组：它们自带 dialer-proxy，
+  // 若被塞进地区组，选「美国」时可能选中「落地-美国」，导致请求全部走链式而失效。
+  for (const proxy of [...filteredProxies]) {`,
+  },
+
   // ── 链式开关跟随本地节点数量（贴了节点自动开，空则自动关，不用手改 62 行）──
   {
     name: '链式开关跟随节点',
