@@ -68,6 +68,7 @@ const ruleOptionsEnable = {
   代理IPV4优先: true, // 是否将订阅节点统一为 IPv4 优先（与“代理IPV6优先”同时开启时不生效）
   代理IPV6优先: false, // 是否将订阅节点统一为 IPv6 优先（与“代理IPV4优先”同时开启时不生效）
   链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
+  本地节点: true, // 从本地文件加载落地节点（公开产物不含凭据）
 };
 
 // 定义前置规则
@@ -2012,6 +2013,33 @@ function main(config) {
     directGroup,
     ...generatedRegionGroups,
   ];
+  // 落地节点来自本地文件，订阅只提供「链式中转」的候选
+  if (ruleOptionsEnable.本地节点 && !ruleOptionsEnable.链式代理) {
+    const localNodesPath = 'C:/Users/wendon/AppData/Roaming/com.appshub/Bettbox/local-nodes.yaml';
+    const localProvider = '本地落地节点';
+    newConfig['proxy-providers'] = {
+      ...(newConfig['proxy-providers'] || {}),
+      [localProvider]: {
+        type: 'file',
+        path: localNodesPath,
+        override: { 'dialer-proxy': dialerProxyName },
+      },
+    };
+    newConfig['proxy-groups'].unshift(
+      {
+        ...selectBaseOption,
+        name: dialerProxyName,
+        proxies: mappedProxies.map((p) => p.name),
+        icon: iconBaseUrl + 'Bypass.svg',
+      },
+      {
+        ...selectBaseOption,
+        name: '链式落地',
+        use: [localProvider],
+        icon: iconBaseUrl + 'Server.svg',
+      },
+    );
+  }
   newConfig['rule-providers'] = finalRuleProviders;
 
   newConfig['rules'] = [

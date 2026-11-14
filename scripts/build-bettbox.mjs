@@ -302,6 +302,52 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://d
     ? [{ name: '链式代理=开', required: false, from: /^(\s*)链式代理:\s*false,/m, to: '$1链式代理: true,' }]
     : []),
 
+  // ── 本地节点：中转/落地凭据只存本地文件，公开产物零凭据 ──
+  // 1) 开关：在 ruleOptionsEnable 里加一个默认开启的「本地节点」
+  {
+    name: '本地节点=开',
+    required: false,
+    from: `  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
+};`,
+    to: `  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
+  本地节点: true, // 从本地文件加载落地节点（公开产物不含凭据）
+};`,
+  },
+  // 2) 注入：mihomo file provider + 「链式中转」/「链式落地」两个组
+  {
+    name: '本地节点 provider 注入',
+    required: false,
+    from: `  newConfig['rule-providers'] = finalRuleProviders;`,
+    to: `  // 落地节点来自本地文件，订阅只提供「链式中转」的候选
+  if (ruleOptionsEnable.本地节点 && !ruleOptionsEnable.链式代理) {
+    const localNodesPath = 'C:/Users/wendon/AppData/Roaming/com.appshub/Bettbox/local-nodes.yaml';
+    const localProvider = '本地落地节点';
+    newConfig['proxy-providers'] = {
+      ...(newConfig['proxy-providers'] || {}),
+      [localProvider]: {
+        type: 'file',
+        path: localNodesPath,
+        override: { 'dialer-proxy': dialerProxyName },
+      },
+    };
+    newConfig['proxy-groups'].unshift(
+      {
+        ...selectBaseOption,
+        name: dialerProxyName,
+        proxies: mappedProxies.map((p) => p.name),
+        icon: iconBaseUrl + 'Bypass.svg',
+      },
+      {
+        ...selectBaseOption,
+        name: '链式落地',
+        use: [localProvider],
+        icon: iconBaseUrl + 'Server.svg',
+      },
+    );
+  }
+  newConfig['rule-providers'] = finalRuleProviders;`,
+  },
+
   // ── 服务默认出口：Bettbox 的「默认代理」对应小火箭的 PROXY ──
   {
     name: 'YouTube=默认代理',
