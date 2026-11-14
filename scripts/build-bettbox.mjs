@@ -323,7 +323,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.length > 0;`,
   },
 
   // ── 本地节点：中转/落地凭据只存本地文件，公开产物零凭据 ──
-  // 1) 开关：在 ruleOptionsEnable 里加一个默认开启的「本地节点」
+  // 1) 开关：在 ruleOptionsEnable 里加「本地节点」（默认关闭，需要时才开）
   {
     name: '本地节点=开',
     required: false,
