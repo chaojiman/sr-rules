@@ -67,7 +67,7 @@ const ruleOptionsEnable = {
   屏蔽代理QUIC流量: true, // 是否屏蔽非国内目标的 QUIC 流量
   代理IPV4优先: true, // 是否将订阅节点统一为 IPv4 优先（与“代理IPV6优先”同时开启时不生效）
   代理IPV6优先: false, // 是否将订阅节点统一为 IPv6 优先（与“代理IPV4优先”同时开启时不生效）
-  链式代理: true, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
+  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
 };
 
 // 定义前置规则
@@ -126,26 +126,7 @@ const prefixRules = [
 //     },
 //   },
 // ];
-// 来自 bettbox/custom-proxies.mjs，由 build-bettbox.mjs 注入
-const customizeProxies = [
-  {
-    "name": "自建-土耳其-Bursa",
-    "type": "vless",
-    "server": "146.103.24.144",
-    "port": 1234,
-    "uuid": "c76ae878-0db7-4cc8-977b-1cf62f913c52",
-    "network": "tcp",
-    "udp": true,
-    "tls": true,
-    "flow": "xtls-rprx-vision",
-    "servername": "www.microsoft.com",
-    "client-fingerprint": "chrome",
-    "reality-opts": {
-      "public-key": "U-roKIwP4Xr3Qt7E6LAzNJGbIjT2iYc-C65pifbeBio",
-      "short-id": ""
-    }
-  }
-];
+const customizeProxies = [];
 
 // 链式代理启用时，自定义节点的 dialer-proxy 引用目标
 const dialerProxyName = '链式中转';

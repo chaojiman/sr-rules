@@ -31,21 +31,7 @@
  *   - 节点名建议带地区关键字（如「日本」「美国」），否则不会归入地区组
  */
 export default [
-  {
-    name: '自建-土耳其-Bursa',
-    type: 'vless',
-    server: '146.103.24.144',
-    port: 1234,
-    uuid: 'c76ae878-0db7-4cc8-977b-1cf62f913c52',
-    network: 'tcp',
-    udp: true,
-    tls: true,
-    flow: 'xtls-rprx-vision',
-    servername: 'www.microsoft.com',
-    'client-fingerprint': 'chrome',
-    'reality-opts': {
-      'public-key': 'U-roKIwP4Xr3Qt7E6LAzNJGbIjT2iYc-C65pifbeBio',
-      'short-id': '',
-    },
-  },
+  // ⚠️ 节点凭据不进公开仓库：真实节点写在私有仓库 chaojiman/sr-rules-private，
+  //    由 .github/workflows/sync-bettbox-private.yml 构建后供 Bettbox 订阅。
+  //    这里保持空数组 → 公开产物不生成链式分组，也不含任何凭据。
 ];
