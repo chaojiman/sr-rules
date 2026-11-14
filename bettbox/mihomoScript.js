@@ -68,7 +68,7 @@ const ruleOptionsEnable = {
   代理IPV4优先: true, // 是否将订阅节点统一为 IPv4 优先（与“代理IPV6优先”同时开启时不生效）
   代理IPV6优先: false, // 是否将订阅节点统一为 IPv6 优先（与“代理IPV4优先”同时开启时不生效）
   链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
-  本地节点: true, // 从本地文件加载落地节点（公开产物不含凭据）
+  本地节点: false, // 从本地文件加载落地节点（可选，默认关；公开产物不含凭据）
 };
 
 // 定义前置规则
@@ -127,10 +127,14 @@ const prefixRules = [
 //     },
 //   },
 // ];
+// ← 把你的落地节点贴进下面这个方括号（形如 [{ name:'…', type:'vless', … }]）；
+//   链式代理开关会跟随节点数量自动开/关，无需再改别的行。
 const customizeProxies = [];
 
 // 链式代理启用时，自定义节点的 dialer-proxy 引用目标
 const dialerProxyName = '链式中转';
+// 有落地节点就自动启用链式；为空则保持关闭（上游在无节点 + 开启时会抛错）
+ruleOptionsEnable.链式代理 = customizeProxies.length > 0;
 
 // 定义全局排除节点的正则表达式，用于排除非地区节点
 const excludeFilter =

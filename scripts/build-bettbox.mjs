@@ -45,7 +45,7 @@ if (fs.existsSync(CUSTOM_FILE)) {
 }
 const customProxiesBlock = customProxies.length
   ? `// 来自 bettbox/custom-proxies.mjs，由 build-bettbox.mjs 注入\nconst customizeProxies = ${JSON.stringify(customProxies, null, 2)};`
-  : `const customizeProxies = [];`;
+  : `// ← 把你的落地节点贴进下面这个方括号（形如 [{ name:'…', type:'vless', … }]）；\n//   链式代理开关会跟随节点数量自动开/关，无需再改别的行。\nconst customizeProxies = [];`;
 
 // ── 补丁定义 ──────────────────────────────────────────────
 // required: 锚点丢失时是否中断构建
@@ -302,6 +302,16 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://d
     ? [{ name: '链式代理=开', required: false, from: /^(\s*)链式代理:\s*false,/m, to: '$1链式代理: true,' }]
     : []),
 
+  // ── 链式开关跟随本地节点数量（贴了节点自动开，空则自动关，不用手改 62 行）──
+  {
+    name: '链式开关跟随节点',
+    required: false,
+    from: `const dialerProxyName = '链式中转';`,
+    to: `const dialerProxyName = '链式中转';
+// 有落地节点就自动启用链式；为空则保持关闭（上游在无节点 + 开启时会抛错）
+ruleOptionsEnable.链式代理 = customizeProxies.length > 0;`,
+  },
+
   // ── 本地节点：中转/落地凭据只存本地文件，公开产物零凭据 ──
   // 1) 开关：在 ruleOptionsEnable 里加一个默认开启的「本地节点」
   {
@@ -310,7 +320,7 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://d
     from: `  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
 };`,
     to: `  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
-  本地节点: true, // 从本地文件加载落地节点（公开产物不含凭据）
+  本地节点: false, // 从本地文件加载落地节点（可选，默认关；公开产物不含凭据）
 };`,
   },
   // 2) 注入：mihomo file provider + 「链式中转」/「链式落地」两个组
