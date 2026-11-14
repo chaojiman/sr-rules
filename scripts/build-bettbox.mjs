@@ -296,6 +296,8 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://d
     to: '$1屏蔽代理QUIC流量: true,',
   },
   { name: 'IPv4优先=开', required: false, from: /^(\s*)代理IPV4优先:\s*false,/m, to: '$1代理IPV4优先: true,' },
+  // 链式：自定义节点作为落地，经「链式中转」组（=订阅节点）中转；dialer-proxy 由上游自动补
+  { name: '链式代理=开', required: false, from: /^(\s*)链式代理:\s*false,/m, to: '$1链式代理: true,' },
 
   // ── 服务默认出口：Bettbox 的「默认代理」对应小火箭的 PROXY ──
   {
