@@ -1306,9 +1306,9 @@ bilibili.protobuf = type=http-response, pattern=^https:\/\/(grpc\.biliapi\.net|a
 # > 大众点评
 # hostname = 103.37.155.60, *.dianping.com, img.meituan.net, p.meituan.com, rms.meituan.com, www.dpfile.com, awp-assets.meituan.net, s3plus.meituan.net, p*.meituan.net, ddplus.meituan.net
 # 开屏广告
-大众点评 = type=http-response, pattern=^https?:\/\/img\.meituan\.net\/(?>dpmobile|goodsawardpic)\/, script-path=https://raw.githubusercontent.com/zirawell/R-Store/9c7c1c2d1b4e69a708074c09610b6694cb7c0fae/Res/Scripts/AntiAd/dianping.js, requires-body=true, timeout=10
+大众点评 = type=http-response, pattern=^https?:\/\/img\.meituan\.net\/(?>dpmobile|goodsawardpic)\/, script-path=https://raw.githubusercontent.com/zirawell/R-Store/f477da9990e927c5b1b9198b328411f015c86b23/Res/Scripts/AntiAd/dianping.js, requires-body=true, timeout=10
 
-大众点评 = type=http-response, pattern=^https?:\/\/ddplus\.meituan\.net\/v\d\/mss_\w+\/picassovc, script-path=https://raw.githubusercontent.com/zirawell/R-Store/9c7c1c2d1b4e69a708074c09610b6694cb7c0fae/Res/Scripts/AntiAd/dianping.js, requires-body=true, timeout=10
+大众点评 = type=http-response, pattern=^https?:\/\/ddplus\.meituan\.net\/v\d\/mss_\w+\/picassovc, script-path=https://raw.githubusercontent.com/zirawell/R-Store/f477da9990e927c5b1b9198b328411f015c86b23/Res/Scripts/AntiAd/dianping.js, requires-body=true, timeout=10
 
 # > 滴滴出行
 # hostname = res.xiaojukeji.com, common.diditaxi.com.cn, hd.xiaojukeji.com, freight.xiaojukeji.com, daijia.kuaidadi.com, ct.xiaojukeji.com, conf.diditaxi.com.cn
@@ -1372,7 +1372,7 @@ bilibili.protobuf = type=http-response, pattern=^https:\/\/(grpc\.biliapi\.net|a
 # >>>>>>>>>>>>>>> ✅ M ✅ <<<<<<<<<<<<<<
 # > 马蜂窝
 # hostname = mapi.mafengwo.cn
-马蜂窝 = type=http-response, pattern=^https?:\/\/mapi\.mafengwo\.cn\/user\/profile\/get_(list|profile), script-path=https://raw.githubusercontent.com/zirawell/R-Store/9c7c1c2d1b4e69a708074c09610b6694cb7c0fae/Res/Scripts/AntiAd/mafengwo.js, requires-body=true, timeout=10
+马蜂窝 = type=http-response, pattern=^https?:\/\/mapi\.mafengwo\.cn\/user\/profile\/get_(list|profile), script-path=https://raw.githubusercontent.com/zirawell/R-Store/f477da9990e927c5b1b9198b328411f015c86b23/Res/Scripts/AntiAd/mafengwo.js, requires-body=true, timeout=10
 
 # > 脉脉
 # hostname = open.taou.com, h3.open.taou.com
@@ -1412,10 +1412,10 @@ bilibili.protobuf = type=http-response, pattern=^https:\/\/(grpc\.biliapi\.net|a
 # >>>>>>>>>>>>>>> ✅ Q ✅ <<<<<<<<<<<<<<
 # > 前程无忧 51Job
 # hostname = appapi.51job*.com, cupid.51job*.comhostname
-51job = type=http-response, pattern=^https?:\/\/cupid\.51job(app)?\.com\/open\/noauth\/recommend\/job-tab-dynamic, script-path=https://raw.githubusercontent.com/zirawell/R-Store/9c7c1c2d1b4e69a708074c09610b6694cb7c0fae/Res/Scripts/AntiAd/51job.js, requires-body=true, timeout=10
+51job = type=http-response, pattern=^https?:\/\/cupid\.51job(app)?\.com\/open\/noauth\/recommend\/job-tab-dynamic, script-path=https://raw.githubusercontent.com/zirawell/R-Store/f477da9990e927c5b1b9198b328411f015c86b23/Res/Scripts/AntiAd/51job.js, requires-body=true, timeout=10
 
 # 我的页净化
-去哒 = type=http-response, pattern=^https?:\/\/cupid\.51job(app)?\.com\/open\/my-page\/, script-path=https://raw.githubusercontent.com/zirawell/R-Store/9c7c1c2d1b4e69a708074c09610b6694cb7c0fae/Res/Scripts/AntiAd/51job.js, requires-body=true, timeout=10
+去哒 = type=http-response, pattern=^https?:\/\/cupid\.51job(app)?\.com\/open\/my-page\/, script-path=https://raw.githubusercontent.com/zirawell/R-Store/f477da9990e927c5b1b9198b328411f015c86b23/Res/Scripts/AntiAd/51job.js, requires-body=true, timeout=10
 
 # >>>>>>>>>>>>>>> ✅ R ✅ <<<<<<<<<<<<<<
 # > Reddit
