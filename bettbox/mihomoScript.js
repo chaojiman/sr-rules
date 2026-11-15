@@ -132,8 +132,8 @@ const customizeProxies = [];
 
 // 链式代理启用时，自定义节点的 dialer-proxy 引用目标
 const dialerProxyName = '链式中转';
-// 有落地节点就自动启用链式；为空则保持关闭（上游在无节点 + 开启时会抛错）
-ruleOptionsEnable.链式代理 = customizeProxies.length > 0;
+// 链式代理由界面开关控制，此处不再自动覆盖
+// ruleOptionsEnable.链式代理 = customizeProxies.length > 0;
 
 // 定义全局排除节点的正则表达式，用于排除非地区节点
 const excludeFilter =
