@@ -49,7 +49,7 @@ const ruleOptionsEnable = {
   PikPak: false, // PikPak网盘服务
   Spotify: false, // Spotify音乐服务
   Crypto: false, // 加密货币相关服务
-  PayPal: false, // PayPal支付服务
+  PayPal: true, // PayPal支付服务
   Patreon: false, // Patreon创作者赞助平台
   EHentai: false, // E-Hentai网站
   AdBlock: true, // 广告拦截
@@ -67,7 +67,7 @@ const ruleOptionsEnable = {
   屏蔽代理QUIC流量: true, // 是否屏蔽非国内目标的 QUIC 流量
   代理IPV4优先: true, // 是否将订阅节点统一为 IPv4 优先（与“代理IPV6优先”同时开启时不生效）
   代理IPV6优先: false, // 是否将订阅节点统一为 IPv6 优先（与“代理IPV4优先”同时开启时不生效）
-  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
+  链式代理: true, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
 };
 
 // 定义前置规则
@@ -1093,9 +1093,6 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const chainEnabled = ruleOptionsEnable.链式代理;
 
   if (!customizeList.length) {
-    if (chainEnabled) {
-      throw new Error('启用失败，请在脚本中添加自定义节点后尝试');
-    }
     return { customProxies: [], customProxyNames: [], customGroup: null };
   }
 

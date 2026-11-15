@@ -310,7 +310,6 @@ if (result && options) {
   };
   const inlineServices = {
     Emby: ['emby', '直连'],
-    PayPal: ['paypal', '直连'],
   };
   for (const name of [...Object.keys(disabledServiceProviders), ...Object.keys(inlineServices)]) {
     check(options[name] === false, `Bettbox ${name} 的独立开关必须关闭`);

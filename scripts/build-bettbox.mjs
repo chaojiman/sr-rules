@@ -276,7 +276,7 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
   { name: 'PikPak=关', required: false, from: /^(\s*)PikPak:\s*true,/m, to: '$1PikPak: false,' },
   { name: 'Spotify=关', required: false, from: /^(\s*)Spotify:\s*true,/m, to: '$1Spotify: false,' },
   { name: 'Crypto=关', required: false, from: /^(\s*)Crypto:\s*true,/m, to: '$1Crypto: false,' },
-  { name: 'PayPal=关', required: false, from: /^(\s*)PayPal:\s*true,/m, to: '$1PayPal: false,' },
+  { name: 'PayPal=开', required: false, from: /^(\s*)PayPal:\s*false,/m, to: '$1PayPal: true,' },
   { name: 'Patreon=关', required: false, from: /^(\s*)Patreon:\s*true,/m, to: '$1Patreon: false,' },
   { name: 'EHentai=关', required: false, from: /^(\s*)EHentai:\s*true,/m, to: '$1EHentai: false,' },
   // 地区组附带「-自动选择」（url-test），同地区内自动挑最快节点
@@ -296,11 +296,8 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
     to: '$1屏蔽代理QUIC流量: true,',
   },
   { name: 'IPv4优先=开', required: false, from: /^(\s*)代理IPV4优先:\s*false,/m, to: '$1代理IPV4优先: true,' },
-  // 链式：自定义节点作为落地，经「链式中转」组（=订阅节点）中转；dialer-proxy 由上游自动补。
-  // 只在注入了自建节点时开启——上游在无自建节点 + 开启链式时会直接抛错，公开仓库必须保持关闭。
-  ...(customProxies.length
-    ? [{ name: '链式代理=开', required: false, from: /^(\s*)链式代理:\s*false,/m, to: '$1链式代理: true,' }]
-    : []),
+  // 链式代理默认开启，空数组时不生成链式分组（不抛错）
+  { name: '链式代理=开', required: false, from: /^(\s*)链式代理:\s*false,/m, to: '$1链式代理: true,' },
 
   // ── 自建落地节点不参与地区分组（否则会混进「美国」「香港」等地区组，被误选成出口）──
   {
@@ -320,6 +317,21 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
     to: `const dialerProxyName = '链式中转';
 // 链式开关由脚本决定：有节点自动开，无节点自动关（覆盖界面设置）
 ruleOptionsEnable.链式代理 = customizeProxies.length > 0;`,
+  },
+
+  // ── 链式默认开启时，空数组不抛错（只返回空分组）──
+  {
+    name: '空节点不抛错',
+    required: false,
+    from: `  if (!customizeList.length) {
+    if (chainEnabled) {
+      throw new Error('启用失败，请在脚本中添加自定义节点后尝试');
+    }
+    return { customProxies: [], customProxyNames: [], customGroup: null };
+  }`,
+    to: `  if (!customizeList.length) {
+    return { customProxies: [], customProxyNames: [], customGroup: null };
+  }`,
   },
 
 
