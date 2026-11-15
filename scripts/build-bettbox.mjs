@@ -180,9 +180,9 @@ const proxyServerDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'htt
 // - chinaDNS=nameserver：system 与 DoH 同组并发竞速（mihomo 无主备，system 恒抢先=明文换速度的既定取舍）
 // - proxyServerDNS 节点域名解析保持全加密，杜绝运营商 UDP 抢答污染
 const defaultDNS = ['223.5.5.5', '119.29.29.29'];
-const chinaDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];
+const chinaDNS = ['system', 'https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://doh.pub/dns-query#DIRECT'];`,
+const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://doh.pub/dns-query#DIRECT'];`,
   },
 
   // ── 必需：DNS 对象（Fake-IP 过滤 + 国内优先解析 + Tailscale MagicDNS）──

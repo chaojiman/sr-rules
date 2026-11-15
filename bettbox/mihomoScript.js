@@ -1,5 +1,5 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
-// 生成日期: 2026-11-14
+// 生成日期: 2026-11-15
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
 // 上游版本: etag dbc7dd1c073b…
 // 上游提交: 4861619 @ 2026-11-12T09:07:42Z
@@ -1520,9 +1520,9 @@ const commonDnsRegex = new RegExp(
 // - chinaDNS=nameserver：system 与 DoH 同组并发竞速（mihomo 无主备，system 恒抢先=明文换速度的既定取舍）
 // - proxyServerDNS 节点域名解析保持全加密，杜绝运营商 UDP 抢答污染
 const defaultDNS = ['223.5.5.5', '119.29.29.29'];
-const chinaDNS = ['system', 'https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];
+const chinaDNS = ['system', 'https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const proxyServerDNS = ['https://223.5.5.5/dns-query#h3=true&DIRECT', 'https://doh.pub/dns-query#DIRECT'];
+const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://doh.pub/dns-query#DIRECT'];
 
 /**
  * hosts 匹配优先级：精确 > +. > . > *（同级按出现顺序）
