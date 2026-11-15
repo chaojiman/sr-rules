@@ -318,8 +318,8 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
     required: false,
     from: `const dialerProxyName = '链式中转';`,
     to: `const dialerProxyName = '链式中转';
-// 链式代理由界面开关控制，此处不再自动覆盖
-// ruleOptionsEnable.链式代理 = customizeProxies.length > 0;`,
+// 链式开关由脚本决定：有节点自动开，无节点自动关（覆盖界面设置）
+ruleOptionsEnable.链式代理 = customizeProxies.length > 0;`,
   },
 
 
