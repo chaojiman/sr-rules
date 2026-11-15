@@ -175,14 +175,14 @@ Compatible_With_Bettbox.policyGroupOptions = serviceConfigs
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
 const defaultDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://1.12.12.12/dns-query#DIRECT'];
 const proxyServerDNS = ['114.114.114.114#DIRECT', 'tls://223.5.5.5#DIRECT', 'https://doh.pub/dns-query#DIRECT'];`,
-    to: `// 对齐小火箭实测结论 + mihomo 字段职责：
-// - defaultDNS=default-nameserver：纯 IP 引导，仅解析 DoH 服务器自身域名，禁放 system/URL
-// - chinaDNS=nameserver：system 与 DoH 同组并发竞速（mihomo 无主备，system 恒抢先=明文换速度的既定取舍）
-// - proxyServerDNS 节点域名解析保持全加密，杜绝运营商 UDP 抢答污染
+    to: `// DNS 配置说明：
+// - defaultDNS：纯 IP 引导，只解析 DoH 服务器自身域名
+// - chinaDNS：system 与 DoH 并发竞速，system 通常最快返回
+// - proxyServerDNS：节点域名解析保持全加密，防止运营商污染
 const defaultDNS = ['223.5.5.5', '119.29.29.29'];
-const chinaDNS = ['system', 'https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];
+const chinaDNS = ['system', 'https://223.5.5.5/dns-query#DIRECT'];
 const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https://dns.google/dns-query#默认代理'];
-const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://doh.pub/dns-query#DIRECT'];`,
+const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];`,
   },
 
   // ── 必需：DNS 对象（Fake-IP 过滤 + 国内优先解析 + Tailscale MagicDNS）──
