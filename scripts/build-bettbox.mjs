@@ -330,7 +330,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.length > 0;`,
     from: `  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
 };`,
     to: `  链式代理: false, // 是否启用链式代理（自定义节点作为落地节点，经“链式中转”策略组中转）
-  本地节点: false, // 从本地文件加载落地节点（可选，默认关；公开产物不含凭据）
+  本地节点: false, // 从本地文件加载落地节点（可选，默认关；与 customizeProxies 互斥，二选一）
 };`,
   },
   // 2) 注入：mihomo file provider + 「链式中转」/「链式落地」两个组

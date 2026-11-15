@@ -9,7 +9,7 @@
 
 | 资产 | 是否随机器丢失 | 能否复用 |
 |---|---|---|
-| 内部端口（默认 8443） | 丢 | 复用同一值，客户端不变 |
+| 内部端口（默认 24843，一律 ≥20000） | 丢 | 复用同一值，客户端不变 |
 | 面板外部转发端口（如 1234） | 丢 | **可能变**——重开实例要重新看面板 |
 | 公网 IP | 丢 | 必然变 |
 | UUID | 不丢（记在本地） | 复用 → 客户端只需改 IP/端口 |
@@ -31,7 +31,7 @@ sb url reality
 grep -o '"private_key": "[^"]*"' /etc/sing-box/conf/VLESS-REALITY-*.json
 ```
 
-另外在面板里记下：`外部端口 → 内网 8443` 这条映射。
+另外在面板里记下：`外部端口 → 内网 24843` 这条映射。
 
 ---
 
@@ -44,7 +44,7 @@ grep -o '"private_key": "[^"]*"' /etc/sing-box/conf/VLESS-REALITY-*.json
 bash <(wget -qO- -o- https://github.com/233boy/sing-box/raw/main/install.sh)
 
 # 2) 建 REALITY，指定端口与 SNI（不要用 auto，脚本会写成字面量 "auto"）
-sb add reality 8443 auto www.microsoft.com
+sb add reality 24843 auto www.microsoft.com
 
 # 3) 复用旧凭据（可选，但客户端就不用改 pbk/uuid 了）
 sb id  reality <旧UUID>
@@ -58,7 +58,7 @@ sb del Hysteria2
 sb url reality
 ```
 
-然后在面板新增映射：`内网 8443 / TCP → 外部新端口`，把链接里的 `:8443` 改成新外部端口。
+然后在面板新增映射：`内网 24843 / TCP → 外部新端口`，把链接里的 `:24843` 改成新外部端口。
 
 ---
 
