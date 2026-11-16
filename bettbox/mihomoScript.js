@@ -26,7 +26,7 @@ const Compatible_With_Bettbox = { ruleOptionsEnable: true };
  */
 const ruleOptionsEnable = {
   // 基础策略组
-  手动选择: true, // 是否启用手动选择策略组
+  手动选择: false, // 是否启用手动选择策略组
   自动选择: false, // 是否启用自动选择策略组
   负载均衡: false, // 是否启用负载均衡策略组
 

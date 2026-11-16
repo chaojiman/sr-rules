@@ -267,7 +267,7 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
   //     加 no-resolve 会让 IP 规则对域名请求直接跳过，国内 IP 兜底形同失效。
 
   // ── 默认值对齐当前 Bettbox UI 实测状态（非必需，上游删项时不中断）──
-  { name: '手动选择=开', required: false, from: /^(\s*)手动选择:\s*(?:true|false),/m, to: '$1手动选择: true,' },
+  { name: '手动选择=关', required: false, from: /^(\s*)手动选择:\s*true,/m, to: '$1手动选择: false,' },
   { name: '自动选择=关', required: false, from: /^(\s*)自动选择:\s*true,/m, to: '$1自动选择: false,' },
   { name: '负载均衡=关', required: false, from: /^(\s*)负载均衡:\s*true,/m, to: '$1负载均衡: false,' },
   { name: 'FCM=关', required: false, from: /^(\s*)FCM:\s*true,/m, to: '$1FCM: false,' },
