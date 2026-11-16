@@ -391,6 +391,12 @@ if (result && options) {
       const built = (result.proxies || []).find(
         (item) => item.name === node.name || (item.name || '').endsWith(node.name),
       );
+      if (node?.direct === true) {
+        // direct: true = 直连落地：不能带 dialer-proxy，且 direct 标记必须已剥离
+        check(Boolean(built) && !built?.['dialer-proxy'], `直连节点 ${node.name} 不应带 dialer-proxy`);
+        check(Boolean(built) && !('direct' in built), `产物残留 direct 标记：${node.name}`);
+        continue;
+      }
       check(built?.['dialer-proxy'] === '链式中转', `链式代理已开，但 ${node.name} 缺少 dialer-proxy`);
     }
   }
