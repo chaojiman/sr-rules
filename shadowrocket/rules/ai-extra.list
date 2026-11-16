@@ -1,6 +1,8 @@
 DOMAIN,openai-api.arkoselabs.com
 DOMAIN-SUFFIX,ai.com
+DOMAIN-SUFFIX,api.statsig.com
 DOMAIN-SUFFIX,client-api.arkoselabs.com
+DOMAIN-SUFFIX,events.statsigapi.net
 DOMAIN-SUFFIX,featuregates.org
 DOMAIN-SUFFIX,observeit.net
 DOMAIN-KEYWORD,openai
