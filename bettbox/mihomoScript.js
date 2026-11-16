@@ -26,7 +26,7 @@ const Compatible_With_Bettbox = { ruleOptionsEnable: true };
  */
 const ruleOptionsEnable = {
   // 基础策略组
-  手动选择: false, // 是否启用手动选择策略组
+  手动选择: true, // 是否启用手动选择策略组
   自动选择: false, // 是否启用自动选择策略组
   负载均衡: false, // 是否启用负载均衡策略组
 
@@ -1114,8 +1114,6 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   }
 
   const customProxyNames = customProxies.map((p) => p.name);
-  // 直连节点（未带 dialer-proxy）额外平铺进「默认代理」，链式节点不进
-  const directProxyNames = customProxies.filter((p) => !p['dialer-proxy']).map((p) => p.name);
 
   const customGroup = {
     ...selectBaseOption,
@@ -1128,7 +1126,6 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   return {
     customProxies,
     customProxyNames,
-    directProxyNames,
     customGroup,
   };
 }
@@ -1150,7 +1147,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   const priorityRules = [];
   const finalRuleProviders = { ...baseRuleProviders };
 
-  const { customProxyNames = [], directProxyNames = [], customGroup = null } = customizeInfo || {};
+  const { customProxyNames = [], customGroup = null } = customizeInfo || {};
   const filteredProxyNames = filteredProxies.map((p) => p.name);
   const allProxiesNames = [...filteredProxyNames, ...customProxyNames];
   const groupNamesOfSelect = generatedRegionGroups.filter((g) => g.type === 'select').map((g) => g.name);
@@ -1222,13 +1219,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   functionalGroups.push({
     ...selectBaseOption,
     name: '默认代理',
-    proxies: [
-      ...groupNamesOfSelect,
-      ...baseGroupNames,
-      ...customGroupNames,
-      // 链式开启时，直连节点平铺可选（链式节点仍只在「链式落地」里）
-      ...(chainEnabled ? directProxyNames : []),
-    ],
+    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],
     icon: `${iconBaseUrl}Proxy.svg`,
   });
 
@@ -1967,7 +1958,7 @@ function main(config) {
 
   const filteredProxies = filterAndNormalizeProxies(config);
 
-  const { customProxies, customProxyNames, directProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);
+  const { customProxies, customProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);
 
   const generatedRegionGroups = ruleOptionsEnable.极简国内外分流模式
     ? []
@@ -1982,7 +1973,7 @@ function main(config) {
     finalRuleProviders,
     chainGroup,
     directGroup,
-  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, directProxyNames, customGroup });
+  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup });
 
   const { dns, hosts, proxies: mappedProxies } = buildDnsAndHostsConfig(config, filteredProxies);
 

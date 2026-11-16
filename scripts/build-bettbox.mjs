@@ -267,7 +267,7 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
   //     加 no-resolve 会让 IP 规则对域名请求直接跳过，国内 IP 兜底形同失效。
 
   // ── 默认值对齐当前 Bettbox UI 实测状态（非必需，上游删项时不中断）──
-  { name: '手动选择=关', required: false, from: /^(\s*)手动选择:\s*true,/m, to: '$1手动选择: false,' },
+  { name: '手动选择=开', required: false, from: /^(\s*)手动选择:\s*(?:true|false),/m, to: '$1手动选择: true,' },
   { name: '自动选择=关', required: false, from: /^(\s*)自动选择:\s*true,/m, to: '$1自动选择: false,' },
   { name: '负载均衡=关', required: false, from: /^(\s*)负载均衡:\s*true,/m, to: '$1负载均衡: false,' },
   { name: 'FCM=关', required: false, from: /^(\s*)FCM:\s*true,/m, to: '$1FCM: false,' },
@@ -345,65 +345,6 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     from: `    name: chainEnabled ? '链式落地' : '自建节点',`,
     to: `    // 名字只跟链式开关走：开着就叫「链式落地」（可能混有 direct 节点），关着叫「自建节点」
     name: chainEnabled ? '链式落地' : '自建节点',`,
-  },
-
-  // ── 直连节点平铺进「默认代理」：一步选中，不用两级 ──
-  {
-    name: '直连节点平铺默认代理',
-    required: false,
-    from: `  const customProxyNames = customProxies.map((p) => p.name);
-
-  const customGroup = {`,
-    to: `  const customProxyNames = customProxies.map((p) => p.name);
-  // 直连节点（未带 dialer-proxy）额外平铺进「默认代理」，链式节点不进
-  const directProxyNames = customProxies.filter((p) => !p['dialer-proxy']).map((p) => p.name);
-
-  const customGroup = {`,
-  },
-  {
-    name: '直连节点名字回传',
-    required: false,
-    from: `    customProxyNames,
-    customGroup,
-  };`,
-    to: `    customProxyNames,
-    directProxyNames,
-    customGroup,
-  };`,
-  },
-  {
-    name: '读取直连节点名字',
-    required: false,
-    from: `  const { customProxyNames = [], customGroup = null } = customizeInfo || {};`,
-    to: `  const { customProxyNames = [], directProxyNames = [], customGroup = null } = customizeInfo || {};`,
-  },
-  {
-    name: '默认代理加直连节点',
-    required: false,
-    from: `    name: '默认代理',
-    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],`,
-    to: `    name: '默认代理',
-    proxies: [
-      ...groupNamesOfSelect,
-      ...baseGroupNames,
-      ...customGroupNames,
-      // 链式开启时，直连节点平铺可选（链式节点仍只在「链式落地」里）
-      ...(chainEnabled ? directProxyNames : []),
-    ],`,
-  },
-
-  {
-    name: '解构直连节点',
-    required: false,
-    from: `  const { customProxies, customProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);`,
-    to: `  const { customProxies, customProxyNames, directProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);`,
-  },
-
-  {
-    name: '调用处传直连节点',
-    required: false,
-    from: `  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup });`,
-    to: `  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, directProxyNames, customGroup });`,
   },
 
   // ── 链式默认开启时，空数组不抛错（只返回空分组）──
