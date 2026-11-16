@@ -38,6 +38,7 @@ const ruleOptionsEnable = {
   GitHub: true, // GitHub代码托管平台
   Microsoft: true, // Microsoft服务
   Apple: true, // Apple服务
+  Oraclevps: true, // Oracle VPS 公网 IP 出口
   Telegram: true, // Telegram通讯软件
   Steam: true, // Steam游戏平台
   TikTok: true, // TikTok视频平台
@@ -529,6 +530,15 @@ const serviceConfigs = [
     icon: `${iconBaseUrl}Apple.svg`,
     rules: ['RULE-SET,apple,Apple'],
     ipRules: ['RULE-SET,apple_ip,Apple'],
+  },
+  {
+    // Oracle VPS 公网 IP：默认直连，需要排查线路时可手切代理
+    name: 'Oraclevps',
+    baseOption: selectBaseOption,
+    direct: true,
+    defaultSelected: '直连',
+    icon: `${iconBaseUrl}Server.svg`,
+    rules: ['IP-CIDR,141.148.16.109/32,Oraclevps,no-resolve'],
   },
   {
     name: 'Telegram',

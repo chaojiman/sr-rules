@@ -51,6 +51,34 @@ const customProxiesBlock = customProxies.length
 // required: 锚点丢失时是否中断构建
 
 const REPLACES = [
+  // ── Oracle VPS 直连组：公网 IP 走独立 select（默认直连），不碰 Tailscale 段 ──
+  {
+    name: 'Oraclevps 开关',
+    required: false,
+    from: `  Apple: true, // Apple服务`,
+    to: `  Apple: true, // Apple服务
+  Oraclevps: true, // Oracle VPS 公网 IP 出口`,
+  },
+  {
+    name: 'Oraclevps 服务组',
+    required: false,
+    from: `  {
+    name: 'Telegram',
+    baseOption: selectBaseOption,`,
+    to: `  {
+    // Oracle VPS 公网 IP：默认直连，需要排查线路时可手切代理
+    name: 'Oraclevps',
+    baseOption: selectBaseOption,
+    direct: true,
+    defaultSelected: '直连',
+    icon: \`\${iconBaseUrl}Server.svg\`,
+    rules: ['IP-CIDR,141.148.16.109/32,Oraclevps,no-resolve'],
+  },
+  {
+    name: 'Telegram',
+    baseOption: selectBaseOption,`,
+  },
+
   // ── 必需：规则顺序 AdBlock → GitHub → AI → 其余 ──
   // GitHub 在 AI 前：Copilot 全系自然归 GitHub，无需逐条钉规则
   // AI 在 Google 前：antigravity/gemini 的 *.googleapis.com 不会被 Google 抢走
