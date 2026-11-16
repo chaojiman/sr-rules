@@ -1091,7 +1091,6 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const usedNames = new Set(filteredProxies.map((p) => p.name));
   const customPrefix = '自建-';
   const customProxies = [];
-  let hasDirectNode = false;
 
   for (const proxy of customizeList) {
     const normalized = normalizeProxyName(proxy);
@@ -1104,7 +1103,6 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     let customProxy = name === normalized.name ? normalized : { ...normalized, name };
     // direct: true = 直连节点，不注入链式中转；该标记只用于构建，必须从产物剥掉
     const isDirectNode = customProxy.direct === true;
-    if (isDirectNode) hasDirectNode = true;
     if ('direct' in customProxy) {
       const { direct, ...rest } = customProxy;
       customProxy = rest;
@@ -1119,8 +1117,8 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
 
   const customGroup = {
     ...selectBaseOption,
-    // 混合直连 + 链式时用中性名，避免「链式落地」里塞着直连节点
-    name: chainEnabled && !hasDirectNode ? '链式落地' : '自建节点',
+    // 名字只跟链式开关走：开着就叫「链式落地」（可能混有 direct 节点），关着叫「自建节点」
+    name: chainEnabled ? '链式落地' : '自建节点',
     proxies: customProxyNames,
     icon: `${iconBaseUrl}Server.svg`,
   };

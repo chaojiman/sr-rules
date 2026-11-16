@@ -322,17 +322,6 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
 
   // ── 直连节点：direct: true 跳过 dialer-proxy 注入，并从产物里剥掉该标记 ──
   {
-    name: '直连节点声明',
-    required: false,
-    from: `  const customProxies = [];
-
-  for (const proxy of customizeList) {`,
-    to: `  const customProxies = [];
-  let hasDirectNode = false;
-
-  for (const proxy of customizeList) {`,
-  },
-  {
     name: '直连节点免链式',
     required: false,
     from: `    let customProxy = name === normalized.name ? normalized : { ...normalized, name };
@@ -342,7 +331,6 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     to: `    let customProxy = name === normalized.name ? normalized : { ...normalized, name };
     // direct: true = 直连节点，不注入链式中转；该标记只用于构建，必须从产物剥掉
     const isDirectNode = customProxy.direct === true;
-    if (isDirectNode) hasDirectNode = true;
     if ('direct' in customProxy) {
       const { direct, ...rest } = customProxy;
       customProxy = rest;
@@ -352,11 +340,11 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     }`,
   },
   {
-    name: '组名区分直连与链式',
+    name: '组名固定为链式落地',
     required: false,
     from: `    name: chainEnabled ? '链式落地' : '自建节点',`,
-    to: `    // 混合直连 + 链式时用中性名，避免「链式落地」里塞着直连节点
-    name: chainEnabled && !hasDirectNode ? '链式落地' : '自建节点',`,
+    to: `    // 名字只跟链式开关走：开着就叫「链式落地」（可能混有 direct 节点），关着叫「自建节点」
+    name: chainEnabled ? '链式落地' : '自建节点',`,
   },
 
   // ── 链式默认开启时，空数组不抛错（只返回空分组）──
