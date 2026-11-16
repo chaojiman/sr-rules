@@ -347,6 +347,65 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     name: chainEnabled ? '链式落地' : '自建节点',`,
   },
 
+  // ── 直连节点平铺进「默认代理」：一步选中，不用两级 ──
+  {
+    name: '直连节点平铺默认代理',
+    required: false,
+    from: `  const customProxyNames = customProxies.map((p) => p.name);
+
+  const customGroup = {`,
+    to: `  const customProxyNames = customProxies.map((p) => p.name);
+  // 直连节点（未带 dialer-proxy）额外平铺进「默认代理」，链式节点不进
+  const directProxyNames = customProxies.filter((p) => !p['dialer-proxy']).map((p) => p.name);
+
+  const customGroup = {`,
+  },
+  {
+    name: '直连节点名字回传',
+    required: false,
+    from: `    customProxyNames,
+    customGroup,
+  };`,
+    to: `    customProxyNames,
+    directProxyNames,
+    customGroup,
+  };`,
+  },
+  {
+    name: '读取直连节点名字',
+    required: false,
+    from: `  const { customProxyNames = [], customGroup = null } = customizeInfo || {};`,
+    to: `  const { customProxyNames = [], directProxyNames = [], customGroup = null } = customizeInfo || {};`,
+  },
+  {
+    name: '默认代理加直连节点',
+    required: false,
+    from: `    name: '默认代理',
+    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],`,
+    to: `    name: '默认代理',
+    proxies: [
+      ...groupNamesOfSelect,
+      ...baseGroupNames,
+      ...customGroupNames,
+      // 链式开启时，直连节点平铺可选（链式节点仍只在「链式落地」里）
+      ...(chainEnabled ? directProxyNames : []),
+    ],`,
+  },
+
+  {
+    name: '解构直连节点',
+    required: false,
+    from: `  const { customProxies, customProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);`,
+    to: `  const { customProxies, customProxyNames, directProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);`,
+  },
+
+  {
+    name: '调用处传直连节点',
+    required: false,
+    from: `  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup });`,
+    to: `  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, directProxyNames, customGroup });`,
+  },
+
   // ── 链式默认开启时，空数组不抛错（只返回空分组）──
   {
     name: '空节点不抛错',
