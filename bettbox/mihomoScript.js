@@ -1,8 +1,8 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
-// 生成日期: 2026-11-15
+// 生成日期: 2026-11-16
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
-// 上游版本: etag dbc7dd1c073b…
-// 上游提交: 4861619 @ 2026-11-12T09:07:42Z
+// 上游版本: etag 35097804c202…
+// 上游提交: 0951a93 @ 2026-11-15T14:39:55Z
 // 本地输入: bettbox/rules-extra.txt, bettbox/custom-proxies.mjs
 // 重新生成: node scripts/build-bettbox.mjs
 // ══════════ sr-rules 构建标记结束 ══════════
@@ -81,14 +81,11 @@ const prefixRules = [
   'IP-CIDR,100.64.0.0/10,直连,no-resolve',
   'IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve',
   'DOMAIN-SUFFIX,ts.net,直连',
-  'PROCESS-NAME,tailscaled.exe,直连',
   'DOMAIN-SUFFIX,morphllm.com,AI',
-  'PROCESS-PATH-REGEX,(?i)\\\\antigravity\\\\,AI',
   'DOMAIN,openai-api.arkoselabs.com,AI',
   'DOMAIN-SUFFIX,client-api.arkoselabs.com,AI',
   'IP-CIDR,24.199.123.28/32,AI,no-resolve',
   'IP-CIDR,64.23.132.171/32,AI,no-resolve',
-  'DOMAIN-KEYWORD,openai,AI',
 
   // 私有网络直连
   'RULE-SET,private,直连',
@@ -1798,24 +1795,36 @@ function simplifyDomainPolicy(policy) {
 /**
  * 构建 DNS 与 hosts：保留私有 DNS、节点域名 policy/fake-ip-filter，并按 hosts 改写节点 server
  * hosts改写条件（满足任意一个条件即可）：
- * 1. proxy-server-nameserver 有且仅有一个 DNS 并且该 DNS 包含非空的 listen 值
- * 2. proxy-server-nameserver 有且仅有一个 DNS 并且该 DNS 包含 127.0.0.1 并且 listen 包含 0.0.0.0
+ * 1. proxy-server-nameserver 不存在或为空
+ * 2. proxy-server-nameserver 有且仅有一个 DNS 并且该 DNS 包含非空的 listen 值
+ * 3. proxy-server-nameserver 有且仅有一个 DNS 并且该 DNS 包含 127.0.0.1 并且 listen 包含 0.0.0.0
  */
 function buildDnsAndHostsConfig(config, filteredProxies) {
   const minimalModeEnabled = ruleOptionsEnable.极简国内外分流模式;
 
   const originalDnsConfig = config.dns || {};
-
-  const proxyServerNameservers = originalDnsConfig['proxy-server-nameserver'] || [];
   const listenValue = originalDnsConfig['listen'];
+  const rawProxyServerNameservers = originalDnsConfig['proxy-server-nameserver'];
 
-  const shouldRewriteByHosts =
+  const proxyServerNameservers = (
+    Array.isArray(rawProxyServerNameservers)
+      ? rawProxyServerNameservers
+      : rawProxyServerNameservers === undefined || rawProxyServerNameservers === null
+        ? []
+        : [rawProxyServerNameservers]
+  ).filter((dns) => String(dns ?? '').trim() !== '');
+
+  const isProxyServerNameserverEmpty = proxyServerNameservers.length === 0;
+
+  const shouldRewriteByListen =
     proxyServerNameservers.length === 1 &&
     typeof listenValue === 'string' &&
     listenValue.length > 0 &&
     (proxyServerNameservers.some((dns) => String(dns).toLowerCase().includes(listenValue.toLowerCase())) ||
       (listenValue.includes('0.0.0.0') &&
         proxyServerNameservers.some((dns) => String(dns).toLowerCase().includes('127.0.0.1'))));
+
+  const shouldRewriteByHosts = isProxyServerNameserverEmpty || shouldRewriteByListen;
 
   const mappedProxies = shouldRewriteByHosts ? applyHostsToProxies(filteredProxies, config.hosts) : filteredProxies;
 

@@ -31,22 +31,9 @@ IP-CIDR,100.64.0.0/10,直连,no-resolve
 IP-CIDR6,fd7a:115c:a1e0::/48,直连,no-resolve
 DOMAIN-SUFFIX,ts.net,直连
 
-# Tailscale 自身流量（控制面 / DERP / UDP 打洞）必须直连：
-# TUN 模式下若被代理，UDP 打洞失败，只能走 DERP 中继（tailscale ping 显示 relay）
-# 系统代理模式下 tailscaled 不走代理，这条不生效也无害
-PROCESS-NAME,tailscaled.exe,直连
-
 # morphllm 走 AI：原指向「美国」，但地区组按节点动态生成，订阅无美国节点时
 # mihomo parseRules 直接报 proxy [美国] not found，整份配置拒绝加载；AI 组恒定存在
 DOMAIN-SUFFIX,morphllm.com,AI
-
-# Antigravity 全进程走 AI：登录 / 推理 / 更新 / 扩展统一出口，避免登录地与调用地不一致触发风控
-# 按安装路径匹配：AI 请求实际由 resources\bin\language_server.exe 发出，
-#   PROCESS-NAME,Antigravity.exe 只管得到主程序；路径含 \antigravity\ 的进程全部命中
-# ⚠️ 进程类规则依赖 Bettbox 界面「查找进程」= 开（always）；
-#    脚本里写 find-process-mode 会被界面覆盖，写了也不生效
-# ⚠️ 系统代理模式下 language_server.exe 不读系统代理，请用 bettbox/Antigravity-proxy.cmd 启动
-PROCESS-PATH-REGEX,(?i)\\antigravity\\,AI
 
 # ===== ChatGPT / OpenAI 登录所需的 Arkose 验证 =====
 # geosite category-ai-!cn 未收录 arkoselabs，缺这两条会在登录页卡在验证码
@@ -56,5 +43,3 @@ DOMAIN-SUFFIX,client-api.arkoselabs.com,AI
 # OpenAI 自建服务器 IP，不在 geoip 库里
 IP-CIDR,24.199.123.28/32,AI,no-resolve
 IP-CIDR,64.23.132.171/32,AI,no-resolve
-# 兜底：所有含 openai 的子域
-DOMAIN-KEYWORD,openai,AI
