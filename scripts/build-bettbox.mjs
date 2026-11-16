@@ -51,33 +51,6 @@ const customProxiesBlock = customProxies.length
 // required: 锚点丢失时是否中断构建
 
 const REPLACES = [
-  // ── Oracle VPS 直连组：公网 IP 走独立 select（默认直连），不碰 Tailscale 段 ──
-  {
-    name: 'Oraclevps 开关',
-    required: false,
-    from: `  Apple: true, // Apple服务`,
-    to: `  Apple: true, // Apple服务
-  Oraclevps: true, // Oracle VPS 公网 IP 出口`,
-  },
-  {
-    name: 'Oraclevps 服务组',
-    required: false,
-    from: `  {
-    name: 'Telegram',
-    baseOption: selectBaseOption,`,
-    to: `  {
-    // Oracle VPS 公网 IP：默认直连，需要排查线路时可手切代理
-    name: 'Oraclevps',
-    baseOption: selectBaseOption,
-    direct: true,
-    defaultSelected: '直连',
-    icon: \`\${iconBaseUrl}Server.svg\`,
-    rules: ['IP-CIDR,141.148.16.109/32,Oraclevps,no-resolve'],
-  },
-  {
-    name: 'Telegram',
-    baseOption: selectBaseOption,`,
-  },
 
   // ── 必需：规则顺序 AdBlock → GitHub → AI → 其余 ──
   // GitHub 在 AI 前：Copilot 全系自然归 GitHub，无需逐条钉规则
@@ -343,8 +316,47 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
     required: false,
     from: `const dialerProxyName = '链式中转';`,
     to: `const dialerProxyName = '链式中转';
-// 链式开关由脚本决定：有节点自动开，无节点自动关（覆盖界面设置）
-ruleOptionsEnable.链式代理 = customizeProxies.length > 0;`,
+// 链式开关由脚本决定：有「非直连」节点自动开，全直连或空则自动关（覆盖界面设置）
+ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true);`,
+  },
+
+  // ── 直连节点：direct: true 跳过 dialer-proxy 注入，并从产物里剥掉该标记 ──
+  {
+    name: '直连节点声明',
+    required: false,
+    from: `  const customProxies = [];
+
+  for (const proxy of customizeList) {`,
+    to: `  const customProxies = [];
+  let hasDirectNode = false;
+
+  for (const proxy of customizeList) {`,
+  },
+  {
+    name: '直连节点免链式',
+    required: false,
+    from: `    let customProxy = name === normalized.name ? normalized : { ...normalized, name };
+    if (chainEnabled && customProxy['dialer-proxy'] !== dialerProxyName) {
+      customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
+    }`,
+    to: `    let customProxy = name === normalized.name ? normalized : { ...normalized, name };
+    // direct: true = 直连节点，不注入链式中转；该标记只用于构建，必须从产物剥掉
+    const isDirectNode = customProxy.direct === true;
+    if (isDirectNode) hasDirectNode = true;
+    if ('direct' in customProxy) {
+      const { direct, ...rest } = customProxy;
+      customProxy = rest;
+    }
+    if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
+      customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
+    }`,
+  },
+  {
+    name: '组名区分直连与链式',
+    required: false,
+    from: `    name: chainEnabled ? '链式落地' : '自建节点',`,
+    to: `    // 混合直连 + 链式时用中性名，避免「链式落地」里塞着直连节点
+    name: chainEnabled && !hasDirectNode ? '链式落地' : '自建节点',`,
   },
 
   // ── 链式默认开启时，空数组不抛错（只返回空分组）──

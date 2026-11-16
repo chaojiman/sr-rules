@@ -1,8 +1,8 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
 // 生成日期: 2026-11-16
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
-// 上游版本: etag 35097804c202…
-// 上游提交: 0951a93 @ 2026-11-15T14:39:55Z
+// 上游版本: etag 3c4572a2d6f0…
+// 上游提交: f888a03 @ 2026-11-16T10:31:02Z
 // 本地输入: bettbox/rules-extra.txt, bettbox/custom-proxies.mjs
 // 重新生成: node scripts/build-bettbox.mjs
 // ══════════ sr-rules 构建标记结束 ══════════
@@ -38,7 +38,6 @@ const ruleOptionsEnable = {
   GitHub: true, // GitHub代码托管平台
   Microsoft: true, // Microsoft服务
   Apple: true, // Apple服务
-  Oraclevps: true, // Oracle VPS 公网 IP 出口
   Telegram: true, // Telegram通讯软件
   Steam: true, // Steam游戏平台
   TikTok: true, // TikTok视频平台
@@ -130,8 +129,8 @@ const customizeProxies = [];
 
 // 链式代理启用时，自定义节点的 dialer-proxy 引用目标
 const dialerProxyName = '链式中转';
-// 链式开关由脚本决定：有节点自动开，无节点自动关（覆盖界面设置）
-ruleOptionsEnable.链式代理 = customizeProxies.length > 0;
+// 链式开关由脚本决定：有「非直连」节点自动开，全直连或空则自动关（覆盖界面设置）
+ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true);
 
 // 定义全局排除节点的正则表达式，用于排除非地区节点
 const excludeFilter =
@@ -532,15 +531,6 @@ const serviceConfigs = [
     ipRules: ['RULE-SET,apple_ip,Apple'],
   },
   {
-    // Oracle VPS 公网 IP：默认直连，需要排查线路时可手切代理
-    name: 'Oraclevps',
-    baseOption: selectBaseOption,
-    direct: true,
-    defaultSelected: '直连',
-    icon: `${iconBaseUrl}Server.svg`,
-    rules: ['IP-CIDR,141.148.16.109/32,Oraclevps,no-resolve'],
-  },
-  {
     name: 'Telegram',
     baseOption: selectBaseOption,
     providers: {
@@ -696,12 +686,7 @@ const serviceConfigs = [
       },
     },
     icon: `${iconBaseUrl}Emby.svg`,
-    rules: [
-      'RULE-SET,emby,Emby',
-      'DOMAIN-SUFFIX,mb3admin.com,Emby',
-      'DOMAIN-SUFFIX,nubebelle.com,Emby',
-      'DOMAIN-KEYWORD,emby,Emby',
-    ],
+    rules: ['RULE-SET,emby,Emby'],
   },
   {
     name: 'PikPak',
@@ -1106,6 +1091,7 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const usedNames = new Set(filteredProxies.map((p) => p.name));
   const customPrefix = '自建-';
   const customProxies = [];
+  let hasDirectNode = false;
 
   for (const proxy of customizeList) {
     const normalized = normalizeProxyName(proxy);
@@ -1116,7 +1102,14 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     usedNames.add(name);
 
     let customProxy = name === normalized.name ? normalized : { ...normalized, name };
-    if (chainEnabled && customProxy['dialer-proxy'] !== dialerProxyName) {
+    // direct: true = 直连节点，不注入链式中转；该标记只用于构建，必须从产物剥掉
+    const isDirectNode = customProxy.direct === true;
+    if (isDirectNode) hasDirectNode = true;
+    if ('direct' in customProxy) {
+      const { direct, ...rest } = customProxy;
+      customProxy = rest;
+    }
+    if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }
     customProxies.push(customProxy);
@@ -1126,7 +1119,8 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
 
   const customGroup = {
     ...selectBaseOption,
-    name: chainEnabled ? '链式落地' : '自建节点',
+    // 混合直连 + 链式时用中性名，避免「链式落地」里塞着直连节点
+    name: chainEnabled && !hasDirectNode ? '链式落地' : '自建节点',
     proxies: customProxyNames,
     icon: `${iconBaseUrl}Server.svg`,
   };
