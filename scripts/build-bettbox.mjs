@@ -359,6 +359,23 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     name: chainEnabled ? '链式落地' : '自建节点',`,
   },
 
+  // ── 必需：链式中转接入地区自动组（前置可自动切换）──
+  // 上游只平铺固定节点：某个入口抖动/限速时整条链失速，只能手动换入口。
+  // 把 url-test 地区自动组排最前（顺序同地区定义，香港在前 → 默认前置=香港-自动选择），
+  // 后面保留平铺节点，需要钉死某个具体入口时仍可选。
+  {
+    name: '链式中转接入地区自动组',
+    required: true,
+    from: `          name: dialerProxyName,
+          proxies: filteredProxyNames,`,
+    to: `          name: dialerProxyName,
+          // 地区自动组在前：前置抖动时自动换入口；平铺节点在后：可手动钉死
+          proxies: [
+            ...generatedRegionGroups.filter((g) => g.type === 'url-test').map((g) => g.name),
+            ...filteredProxyNames,
+          ],`,
+  },
+
   // ── 链式默认开启时，空数组不抛错（只返回空分组）──
   {
     name: '空节点不抛错',

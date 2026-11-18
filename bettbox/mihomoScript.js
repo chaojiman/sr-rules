@@ -1160,7 +1160,11 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
       ? {
           ...selectBaseOption,
           name: dialerProxyName,
-          proxies: filteredProxyNames,
+          // 地区自动组在前：前置抖动时自动换入口；平铺节点在后：可手动钉死
+          proxies: [
+            ...generatedRegionGroups.filter((g) => g.type === 'url-test').map((g) => g.name),
+            ...filteredProxyNames,
+          ],
           icon: `${iconBaseUrl}Bypass.svg`,
         }
       : null;
