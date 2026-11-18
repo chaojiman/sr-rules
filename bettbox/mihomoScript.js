@@ -1,8 +1,8 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
-// 生成日期: 2026-11-16
+// 生成日期: 2026-11-18
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
 // 上游版本: etag 3c4572a2d6f0…
-// 上游提交: f888a03 @ 2026-11-16T10:31:02Z
+// 上游提交: 858e336 @ 2026-11-18T10:49:01Z
 // 本地输入: bettbox/rules-extra.txt, bettbox/custom-proxies.mjs
 // 重新生成: node scripts/build-bettbox.mjs
 // ══════════ sr-rules 构建标记结束 ══════════
@@ -344,7 +344,8 @@ const baseRuleProviders = {
 // 策略组公共配置
 const groupBaseOption = {
   timeout: 5000,
-  url: 'https://www.apple.com/library/test/success.html',
+  // Apple 测试页命中大陆 CDN，会把所有节点压成 30ms 级，失去区分度
+  url: 'https://www.gstatic.com/generate_204',
   'max-failed-times': 3,
   'empty-fallback': 'REJECT',
 };

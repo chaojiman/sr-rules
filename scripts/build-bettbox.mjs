@@ -266,6 +266,18 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
   // 注：上游 cn_ip / private_ip 本来就不带 no-resolve，无需补丁。
   //     加 no-resolve 会让 IP 规则对域名请求直接跳过，国内 IP 兜底形同失效。
 
+  // ── 必需：健康检查 / 自动测速 URL 不用 Apple ──
+  // Apple 测试页在大陆有 CDN：同一美国节点实测 apple 33ms vs gstatic 190ms（2026-11-18，5/5 成功），
+  // 会把所有节点压成 30ms 级，url-test / 健康检查失去区分度。改用无国内边缘的 gstatic。
+  // 注：Bettbox 节点列表显示的延迟来自 UI 设置里的 testUrl，不受本脚本控制。
+  {
+    name: '健康检查 URL 改 gstatic',
+    required: true,
+    from: `  url: 'https://www.apple.com/library/test/success.html',`,
+    to: `  // Apple 测试页命中大陆 CDN，会把所有节点压成 30ms 级，失去区分度
+  url: 'https://www.gstatic.com/generate_204',`,
+  },
+
   // ── 默认值对齐当前 Bettbox UI 实测状态（非必需，上游删项时不中断）──
   { name: '手动选择=关', required: false, from: /^(\s*)手动选择:\s*true,/m, to: '$1手动选择: false,' },
   { name: '自动选择=关', required: false, from: /^(\s*)自动选择:\s*true,/m, to: '$1自动选择: false,' },
