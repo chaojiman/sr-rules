@@ -353,6 +353,7 @@ const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53
   { name: 'PikPak=关', required: false, from: /^(\s*)PikPak:\s*true,/m, to: '$1PikPak: false,' },
   { name: 'Spotify=关', required: false, from: /^(\s*)Spotify:\s*true,/m, to: '$1Spotify: false,' },
   { name: 'Crypto=关', required: false, from: /^(\s*)Crypto:\s*true,/m, to: '$1Crypto: false,' },
+  { name: '过滤低倍率节点=开', required: false, from: /^(\s*)过滤低倍率节点:\s*false,/m, to: '$1过滤低倍率节点: true,' },
   { name: 'PayPal=开', required: false, from: /^(\s*)PayPal:\s*false,/m, to: '$1PayPal: true,' },
   { name: 'Patreon=关', required: false, from: /^(\s*)Patreon:\s*true,/m, to: '$1Patreon: false,' },
   { name: 'EHentai=关', required: false, from: /^(\s*)EHentai:\s*true,/m, to: '$1EHentai: false,' },
