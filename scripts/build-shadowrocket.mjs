@@ -683,6 +683,36 @@ async function pruneShadowed() {
   }
 }
 
+// ── 配置组校验：地区组必须排除低倍率节点，且必须有对应的 url-test 自动组 ──
+// 只影响构建是否通过，不影响小火箭运行时的任何行为
+function validateProxyGroups() {
+  const conf = fs.readFileSync(path.resolve('shadowrocket/config.conf'), 'utf8');
+  const section = conf.split('[Proxy Group]')[1]?.split('[Rule]')[0] || '';
+  const lines = section.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  const regions = ['香港', '日本', '美国', '台湾', '新加坡', '韩国'];
+  const GUARD = '^(?!.*x0\\.)';
+  const errors = [];
+  for (const r of regions) {
+    const manual = lines.find((l) => l.startsWith(r + '节点 = '));
+    const auto = lines.find((l) => l.startsWith(r + '-自动 = url-test,'));
+    if (!manual) errors.push(`缺少手动组：${r}节点`);
+    else if (!manual.includes('policy-regex-filter=' + GUARD)) errors.push(`${r}节点 未排除低倍率（policy-regex-filter 应以 ${GUARD} 开头）`);
+    if (!auto) errors.push(`缺少自动组：${r}-自动`);
+    else {
+      if (!auto.includes('url=')) errors.push(`${r}-自动 缺少 url=`);
+      if (!auto.includes('interval=')) errors.push(`${r}-自动 缺少 interval=`);
+      if (!auto.includes(GUARD)) errors.push(`${r}-自动 未排除低倍率`);
+    }
+  }
+  if (errors.length) {
+    console.error(`❌ 代理组校验失败（${errors.length}）：\n  ${errors.join('\n  ')}`);
+    process.exit(1);
+  }
+  console.log(`代理组校验：6 个地区均有手动组 + url-test 自动组，且已排除低倍率节点（x0.）`);
+}
+
+validateProxyGroups();
+
 if (only.length === 0) {
   await pruneShadowed();
 } else {
