@@ -250,6 +250,14 @@ const foreignDNS = ['https://cloudflare-dns.com/dns-query#默认代理', 'https:
 const proxyServerDNS = ['https://223.5.5.5/dns-query#DIRECT', 'https://120.53.53.53/dns-query#DIRECT'];`,
   },
 
+  // ── 必需：DNS 关闭 IPv6（应用流量锁 v4，避免视频等连接被慢 v6 抢先建立）──
+  {
+    name: 'DNS 关闭 IPv6',
+    required: true,
+    from: `    enable: true,\n    ipv6: true,`,
+    to: `    enable: true,\n    ipv6: false,`,
+  },
+
   // ── 必需：DNS 对象（Fake-IP 过滤 + 国内优先解析 + Tailscale MagicDNS）──
   {
     name: 'DNS 对象：geolocation-cn 全家 + ts.net MagicDNS',

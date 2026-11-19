@@ -1912,7 +1912,7 @@ function buildDnsAndHostsConfig(config, filteredProxies) {
 
   const dns = {
     enable: true,
-    ipv6: true,
+    ipv6: false,
     'use-hosts': true,
     'cache-algorithm': 'arc',
     'use-system-hosts': true,
