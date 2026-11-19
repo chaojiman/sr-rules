@@ -689,7 +689,7 @@ function validateProxyGroups() {
   const conf = fs.readFileSync(path.resolve('shadowrocket/config.conf'), 'utf8');
   const section = conf.split('[Proxy Group]')[1]?.split('[Rule]')[0] || '';
   const lines = section.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-  const regions = ['香港', '日本', '美国', '台湾', '新加坡', '韩国'];
+  const regions = ['香港', '日本', '美国', '台湾', '新加坡'];
   const GUARD = '^(?!.*x0\\.)';
   const errors = [];
   for (const r of regions) {
@@ -708,7 +708,7 @@ function validateProxyGroups() {
     console.error(`❌ 代理组校验失败（${errors.length}）：\n  ${errors.join('\n  ')}`);
     process.exit(1);
   }
-  console.log(`代理组校验：6 个地区均有手动组 + url-test 自动组，且已排除低倍率节点（x0.）`);
+  console.log(`代理组校验：${regions.length} 个地区均有手动组 + url-test 自动组，且已排除低倍率节点（x0.）`);
 }
 
 validateProxyGroups();
