@@ -84,7 +84,7 @@ for (let i = start; i < code.length; i += 1) {
 }
 if (end < 0) fail('customizeProxies 数组括号不配对');
 const injected = `[\n${proxies.map((p) => `  ${JSON.stringify(p)}`).join(',\n')},\n]`;
-code = `${code.slice(0, start)}${injected}${code.slice(end + 1)}`;
+code = `${code.slice(0, start)}${injected}${code.slice(end)}`;
 
 // ── 5. 语法校验 ──
 try {
@@ -95,6 +95,13 @@ try {
 
 // ── 6. 备份 + 写入 ──
 const bak = `${dst}.bak-${Date.now()}`;
+// 只保留最近 2 个备份
+const bakDir = path.dirname(dst);
+const olds = fs.readdirSync(bakDir)
+  .filter((f) => f.startsWith(path.basename(dst) + '.bak-'))
+  .map((f) => ({ f, m: fs.statSync(path.join(bakDir, f)).mtimeMs }))
+  .sort((a, b) => b.m - a.m);
+for (const { f } of olds.slice(1)) fs.unlinkSync(path.join(bakDir, f));
 fs.copyFileSync(dst, bak);
 fs.writeFileSync(dst, code, 'utf8');
 console.log(`  已备份: ${path.basename(bak)}`);
