@@ -11,6 +11,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import vm from 'vm';
 import { pathToFileURL } from 'url';
 
 const SRC = 'https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js';
@@ -37,11 +38,73 @@ const extraBlock = extraRules.length
 
 // ── 自建节点：从 bettbox/custom-proxies.mjs 读取，注入 customizeProxies ──
 // 放在仓库里而不是手改生成文件，否则每日同步会覆盖。
-const CUSTOM_FILE = path.resolve('bettbox/custom-proxies.mjs');
+// 凭据不进公开仓库：可用环境变量 BETTBOX_PROXIES_FILE 指向仓库外的本地文件
+//（.mjs 导出 default 数组，或 .json 直接是数组），例如 OneDrive 里的私有节点表。
+const CUSTOM_FILE = process.env.BETTBOX_PROXIES_FILE
+  ? path.resolve(process.env.BETTBOX_PROXIES_FILE)
+  : path.resolve('bettbox/custom-proxies.mjs');
+
+/**
+ * 从 Bettbox 的脚本缓存中提取落地节点（零手填）。
+ * Bettbox 每次拉取覆写脚本后会存到 %APPDATA%\com.appshub\Bettbox\scripts\<id>.js，
+ * 其中 const customizeProxies = [ ... ] 就是它实际使用的自建/落地节点。
+ */
+function readProxiesFromBettboxCache() {
+  const dir = path.join(process.env.APPDATA || '', 'com.appshub', 'Bettbox', 'scripts');
+  if (!fs.existsSync(dir)) return [];
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => ({ f, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+  for (const { f } of files) {
+    const code = fs.readFileSync(path.join(dir, f), 'utf8');
+    const m = code.match(/^const customizeProxies = \[/m);
+    if (!m) continue;
+    const start = m.index + m[0].length - 1;
+    let depth = 0;
+    let end = -1;
+    for (let k = start; k < code.length; k += 1) {
+      if (code[k] === '[') depth += 1;
+      else if (code[k] === ']') {
+        depth -= 1;
+        if (depth === 0) {
+          end = k + 1;
+          break;
+        }
+      }
+    }
+    if (end < 0) continue;
+    try {
+      // 只求值数组字面量，不执行整段脚本
+      const arr = vm.runInNewContext(`(${code.slice(start, end)})`, {});
+      if (Array.isArray(arr) && arr.length) {
+        console.log(`自建节点：从 Bettbox 缓存 ${f} 提取 ${arr.length} 个`);
+        return arr;
+      }
+    } catch {
+      /* 继续找下一个 */
+    }
+  }
+  return [];
+}
+
 let customProxies = [];
-if (fs.existsSync(CUSTOM_FILE)) {
-  const mod = await import(pathToFileURL(CUSTOM_FILE).href);
-  customProxies = Array.isArray(mod.default) ? mod.default : [];
+const useBettboxCache = process.env.BETTBOX_PROXIES_FILE === 'auto';
+if (useBettboxCache) {
+  customProxies = readProxiesFromBettboxCache();
+  if (!customProxies.length) console.log('自建节点：Bettbox 缓存中未找到节点，按 0 个处理');
+} else if (fs.existsSync(CUSTOM_FILE)) {
+  if (CUSTOM_FILE.toLowerCase().endsWith('.json')) {
+    customProxies = JSON.parse(fs.readFileSync(CUSTOM_FILE, 'utf8'));
+  } else {
+    const mod = await import(pathToFileURL(CUSTOM_FILE).href);
+    customProxies = mod.default;
+  }
+  if (!Array.isArray(customProxies)) customProxies = [];
+  console.log(`自建节点：${customProxies.length} 个（来源 ${CUSTOM_FILE}）`);
+} else {
+  console.log(`自建节点：未找到 ${CUSTOM_FILE}，按 0 个处理`);
 }
 const customProxiesBlock = customProxies.length
   ? `// 来自 bettbox/custom-proxies.mjs，由 build-bettbox.mjs 注入\nconst customizeProxies = ${JSON.stringify(customProxies, null, 2)};`
@@ -459,6 +522,80 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
   {
     name: '新加坡',
     flag: '🇸🇬',`,
+  },
+
+  // ── 链式落地按地区自动分组（L2）──
+  // 落地节点名带地区时，额外生成「链式落地-<地区>」select 组，
+  // 让默认代理 / 各分流组能直接选某地区的落地，而不必在明细节点里翻找。
+  // 不改变上游行为：地区组仍不含落地节点，「链式落地」组照旧存在。
+  {
+    name: '链式落地按地区生成子组',
+    required: true,
+    from: `  return {
+    customProxies,
+    customProxyNames,
+    customGroup,
+  };
+}`,
+    to: `  // 按落地节点名字里的地区自动生成子组（链式落地-日本 / 链式落地-美国 …）
+  const regionBuckets = {};
+  if (chainEnabled) {
+    for (const proxy of customProxies) {
+      for (const region of getMatchedRegions(proxy.name)) {
+        (regionBuckets[region.name] ||= []).push(proxy.name);
+      }
+    }
+  }
+  const customRegionGroups = Object.entries(regionBuckets).map(([region, proxies]) => ({
+    ...selectBaseOption,
+    name: \`链式落地-\${region}\`,
+    proxies,
+    icon: \`\${iconBaseUrl}Server.svg\`,
+  }));
+
+  return {
+    customProxies,
+    customProxyNames,
+    customGroup,
+    customRegionGroups,
+  };
+}`,
+  },
+  {
+    name: '分流组接收地区落地子组',
+    required: true,
+    from: `  const { customProxyNames = [], customGroup = null } = customizeInfo || {};`,
+    to: `  const { customProxyNames = [], customGroup = null, customRegionGroups = [] } = customizeInfo || {};`,
+  },
+  {
+    name: 'customGroupNames 含地区落地子组',
+    required: true,
+    from: `  const customGroupNames = customGroup ? [customGroup.name] : [];`,
+    to: `  const customGroupNames = [
+    ...(customGroup ? [customGroup.name] : []),
+    ...customRegionGroups.map((g) => g.name),
+  ];`,
+  },
+  {
+    name: '主流程接收地区落地子组',
+    required: true,
+    from: `  const { customProxies, customProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);`,
+    to: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [] } = buildCustomizeGroups(filteredProxies);`,
+  },
+  {
+    name: '分流组构建接收地区落地子组',
+    required: true,
+    from: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup });`,
+    to: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups });`,
+  },
+  {
+    name: '输出地区落地子组',
+    required: true,
+    from: `    ...(customGroup ? [customGroup] : []),
+    ...(chainGroup ? [chainGroup] : []),`,
+    to: `    ...(customGroup ? [customGroup] : []),
+    ...customRegionGroups,
+    ...(chainGroup ? [chainGroup] : []),`,
   },
 ];
 

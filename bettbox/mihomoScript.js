@@ -1,5 +1,5 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
-// 生成日期: 2026-11-18
+// 生成日期: 2026-11-19
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
 // 上游版本: etag 3c4572a2d6f0…
 // 上游提交: 858e336 @ 2026-11-18T10:49:01Z
@@ -1124,10 +1124,27 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     icon: `${iconBaseUrl}Server.svg`,
   };
 
+  // 按落地节点名字里的地区自动生成子组（链式落地-日本 / 链式落地-美国 …）
+  const regionBuckets = {};
+  if (chainEnabled) {
+    for (const proxy of customProxies) {
+      for (const region of getMatchedRegions(proxy.name)) {
+        (regionBuckets[region.name] ||= []).push(proxy.name);
+      }
+    }
+  }
+  const customRegionGroups = Object.entries(regionBuckets).map(([region, proxies]) => ({
+    ...selectBaseOption,
+    name: `链式落地-${region}`,
+    proxies,
+    icon: `${iconBaseUrl}Server.svg`,
+  }));
+
   return {
     customProxies,
     customProxyNames,
     customGroup,
+    customRegionGroups,
   };
 }
 
@@ -1148,12 +1165,15 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   const priorityRules = [];
   const finalRuleProviders = { ...baseRuleProviders };
 
-  const { customProxyNames = [], customGroup = null } = customizeInfo || {};
+  const { customProxyNames = [], customGroup = null, customRegionGroups = [] } = customizeInfo || {};
   const filteredProxyNames = filteredProxies.map((p) => p.name);
   const allProxiesNames = [...filteredProxyNames, ...customProxyNames];
   const groupNamesOfSelect = generatedRegionGroups.filter((g) => g.type === 'select').map((g) => g.name);
   const baseGroupNames = baseGroups.filter((g) => ruleOptionsEnable[g.name]).map((g) => g.name);
-  const customGroupNames = customGroup ? [customGroup.name] : [];
+  const customGroupNames = [
+    ...(customGroup ? [customGroup.name] : []),
+    ...customRegionGroups.map((g) => g.name),
+  ];
 
   const chainGroup =
     chainEnabled && customGroup
@@ -1963,7 +1983,7 @@ function main(config) {
 
   const filteredProxies = filterAndNormalizeProxies(config);
 
-  const { customProxies, customProxyNames, customGroup } = buildCustomizeGroups(filteredProxies);
+  const { customProxies, customProxyNames, customGroup, customRegionGroups = [] } = buildCustomizeGroups(filteredProxies);
 
   const generatedRegionGroups = ruleOptionsEnable.极简国内外分流模式
     ? []
@@ -1978,7 +1998,7 @@ function main(config) {
     finalRuleProviders,
     chainGroup,
     directGroup,
-  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup });
+  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups });
 
   const { dns, hosts, proxies: mappedProxies } = buildDnsAndHostsConfig(config, filteredProxies);
 
@@ -2027,6 +2047,7 @@ function main(config) {
     globalGroup,
     ...functionalGroups,
     ...(customGroup ? [customGroup] : []),
+    ...customRegionGroups,
     ...(chainGroup ? [chainGroup] : []),
     directGroup,
     ...generatedRegionGroups,

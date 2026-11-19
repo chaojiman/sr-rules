@@ -1,0 +1,10 @@
+
+# 本地备份（不提交）
+bettbox/*.bak-*
+scripts/*.bak-*
+
+# 本地节点凭据（含真实密码，绝不提交）
+proxies.local.json
+
+# 待粘贴副本（含凭据）
+paste-me.js
