@@ -96,7 +96,8 @@ if (useBettboxCache) {
   if (!customProxies.length) console.log('自建节点：Bettbox 缓存中未找到节点，按 0 个处理');
 } else if (fs.existsSync(CUSTOM_FILE)) {
   if (CUSTOM_FILE.toLowerCase().endsWith('.json')) {
-    customProxies = JSON.parse(fs.readFileSync(CUSTOM_FILE, 'utf8'));
+    // 允许 JSON 与 JS 对象字面量（单引号/无引号键）两种写法
+    customProxies = vm.runInNewContext(`(${fs.readFileSync(CUSTOM_FILE, 'utf8')})`, {});
   } else {
     const mod = await import(pathToFileURL(CUSTOM_FILE).href);
     customProxies = mod.default;
