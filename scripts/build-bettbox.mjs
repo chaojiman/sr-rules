@@ -502,6 +502,18 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     defaultSelected: '默认代理',`,
   },
 
+  // ── 漏网之鱼补齐候选：与其他服务组一致 ──
+  // 上游 漏网之鱼 只有 默认代理/直连/地区组，缺 链式落地(-地区) 与 手动选择，
+  // 导致 MATCH 兜底流量选不到自建链式落地节点。
+  {
+    name: '漏网之鱼补链式落地+基础组',
+    required: false,
+    from: `    proxies: ['默认代理', '直连', ...groupNamesOfSelect],
+    icon: \`\${iconBaseUrl}Stack.svg\`,`,
+    to: `    proxies: ['默认代理', '直连', ...customGroupNames, ...baseGroupNames, ...groupNamesOfSelect],
+    icon: \`\${iconBaseUrl}Stack.svg\`,`,
+  },
+
   // ── AI 组只保留真正的 AI 服务 ──
   // 上游把 OpenAI 用到的通用第三方（Intercom 客服、Fathom 统计）也划给了 AI 组，
   // 导致所有接入这些服务的站点都被固定走 AI 组（默认美国）。

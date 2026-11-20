@@ -1322,7 +1322,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   functionalGroups.push({
     ...selectBaseOption,
     name: '漏网之鱼',
-    proxies: ['默认代理', '直连', ...groupNamesOfSelect],
+    proxies: ['默认代理', '直连', ...customGroupNames, ...baseGroupNames, ...groupNamesOfSelect],
     icon: `${iconBaseUrl}Stack.svg`,
   });
 
