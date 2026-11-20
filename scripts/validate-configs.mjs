@@ -349,16 +349,22 @@ if (result && options) {
   // 上游只有港/日/美/新/台；开着「过滤非地区节点」时韩国节点会被丢掉
   check(groupsByName.has('韩国'), 'Bettbox 必须生成「韩国」地区组');
 
+  // AI 优先走美国落地组；链式关闭（无自建落地节点）时不写默认，回退首项「默认代理」
   const expectedDefaults = {
     YouTube: '默认代理',
     TikTok: '默认代理',
-    AI: '美国',
+    AI: groupsByName.has('链式落地-美国') ? '链式落地-美国' : undefined,
   };
   for (const [name, selected] of Object.entries(expectedDefaults)) {
     const group = groupsByName.get(name);
+    if (selected === undefined) {
+      check(!group?.['default-selected'], `Bettbox ${name} 无链式落地时不应写默认出口`);
+      continue;
+    }
     check(group?.['default-selected'] === selected, `Bettbox ${name} 默认出口必须是 ${selected}`);
     check(group?.proxies?.includes(selected), `Bettbox ${name} 策略组缺少选项 ${selected}`);
   }
+  check(/defaultSelected: '链式落地-美国'/.test(bettboxCode), 'Bettbox 源码 AI 默认出口应指向链式落地-美国');
 
   const ads = indexOfRule('RULE-SET,category-ads,AdBlock');
   const github = indexOfRule('RULE-SET,github,GitHub');
