@@ -197,18 +197,20 @@ if (!process.env.INJECT_SKIP_RUNNING_CHECK && bettboxRunning()) {
 }
 backup(cfgPath);
 cfg.scriptProps.scripts[0].content = code;
-// 自动测速组（链式落地 / 链式落地-地区）删掉记忆选择，香港组回到「香港-自动选择」：
-// App 会把 selectedMap 里的旧选择重新套上去，不清掉就会停在已删除/改名的旧节点上
+// 选择记忆优先：只清掉链式落地组里指向「已删除/改名节点」的记忆（否则 App 一直显示旧名字），有效的照旧保留。
+// 这些组只含本地落地节点和「…-自动选择」子组，所以能逐个判断是否还存在；名字前的国旗由脚本自动加，比对时去掉
+const localNames = new Set(proxies.filter((p) => p.direct !== true).map((p) => p.name)); // 只有真落地会进链式落地组
+const stripFlag = (s) => String(s).replace(/^(?:\p{Regional_Indicator}{2})\s*/u, '');
 for (const profile of cfg.profiles || []) {
   if (profile.scriptId !== script.id || !profile.selectedMap) continue;
   const map = profile.selectedMap;
-  const reset = Object.keys(map).filter((k) => k === '链式落地' || k.startsWith('链式落地-'));
-  for (const k of reset) delete map[k];
-  if ('香港' in map && map['香港'] !== '香港-自动选择') {
-    map['香港'] = '香港-自动选择';
-    reset.push('香港');
-  }
-  if (reset.length) console.log(`  已重置「${profile.label ?? profile.id}」的分组选择: ${reset.join('、')}`);
+  const stale = Object.keys(map).filter((k) => {
+    if (k !== '链式落地' && !k.startsWith('链式落地-')) return false;
+    const v = map[k];
+    return !(localNames.has(stripFlag(v)) || (v.startsWith('链式落地') && v.endsWith('-自动选择')));
+  });
+  for (const k of stale) delete map[k];
+  if (stale.length) console.log(`  已清理「${profile.label ?? profile.id}」失效的选择记忆: ${stale.join('、')}`);
 }
 fs.writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
 console.log(`  已写入 config.json 脚本内容（原 url: ${prevUrl || '无'}）`);
