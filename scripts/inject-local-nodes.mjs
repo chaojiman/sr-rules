@@ -14,6 +14,7 @@
 import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
+import { execSync } from 'node:child_process';
 
 const REPO_RAW = 'https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.js';
 const BETTBOX_DIR = path.join(process.env.APPDATA || '', 'com.appshub', 'Bettbox');
@@ -40,6 +41,18 @@ console.log(`  本地节点: ${proxies.length} 个`);
 for (const p of proxies) console.log(`    - ${p.name}`);
 
 // ── 2. 定位 Bettbox 脚本（写入目标，同时是离线源） ──
+// App 重建配置时用的是 config.json 里的脚本内容，运行中改会被覆盖，所以先要求退出
+function bettboxRunning() {
+  try {
+    return execSync('tasklist /FI "IMAGENAME eq Bettbox.exe" /NH', { encoding: 'utf8' }).includes('Bettbox.exe');
+  } catch {
+    return false;
+  }
+}
+if (!process.env.INJECT_SKIP_RUNNING_CHECK && bettboxRunning()) {
+  fail('Bettbox 正在运行。先托盘退出（右下角图标 → 退出），再双击本文件；否则写入会被 App 覆盖');
+}
+
 const cfgPath = path.join(BETTBOX_DIR, 'config.json');
 if (!fs.existsSync(cfgPath)) fail(`找不到 ${cfgPath}`);
 const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
@@ -109,15 +122,35 @@ fs.copyFileSync(dst, bak);
 fs.writeFileSync(dst, code, 'utf8');
 console.log(`  已备份: ${path.basename(bak)}`);
 console.log(`  已写入: ${dst}`);
-// ── 7. Bettbox 只在切换/重启配置时重建，检查运行配置是否已跟上 ──
-const profileId = cfg.currentProfileId;
-const cachePath = profileId ? path.join(BETTBOX_DIR, 'relay', `cache-${profileId}.json`) : null;
-const stale = Boolean(cachePath && fs.existsSync(cachePath) && fs.statSync(cachePath).mtimeMs < fs.statSync(dst).mtimeMs);
-console.log('\n  完成。');
-if (stale) {
-  console.log('  ⚠️ Bettbox 运行配置早于本次注入：仅点「重连」不会重跑脚本。');
-  console.log('     托盘退出 Bettbox 后重开（或切换一次配置再切回），新分组才会出现。');
-} else {
-  console.log('  运行配置已是最新，直接重连即可。');
+// ── 7. 写进 config.json：App 重建配置只认这里，缓存脚本会被 URL 覆盖 ──
+const backup = (file) => {
+  const bak = `${file}.bak-${Date.now()}`;
+  fs.copyFileSync(file, bak);
+  const dir = path.dirname(file);
+  const olds = fs.readdirSync(dir)
+    .filter((f) => f.startsWith(path.basename(file) + '.bak-'))
+    .map((f) => ({ f, m: fs.statSync(path.join(dir, f)).mtimeMs }))
+    .sort((a, b) => b.m - a.m);
+  for (const { f } of olds.slice(1)) fs.unlinkSync(path.join(dir, f));
+  return bak;
+};
+
+const prevUrl = cfg.scriptProps?.scripts?.[0]?.url || '';
+backup(cfgPath);
+cfg.scriptProps.scripts[0].content = code;
+fs.writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
+console.log(`  已写入 config.json 脚本内容（原 url: ${prevUrl || '无'}）`);
+
+const optPath = path.join(BETTBOX_DIR, 'scripts', 'opt.json');
+if (fs.existsSync(optPath)) {
+  const opt = JSON.parse(fs.readFileSync(optPath, 'utf8'));
+  if (opt['链式代理'] !== true) {
+    backup(optPath);
+    opt['链式代理'] = true;
+    fs.writeFileSync(optPath, `${JSON.stringify(opt, null, 2)}\n`, 'utf8');
+    console.log('  已打开脚本选项「链式代理」');
+  }
 }
+
+console.log('\n  完成。启动 Bettbox 会按这份脚本重建配置。');
 console.log('  组: 链式落地 / 链式落地-<地区>；链式中转 决定前置。');
