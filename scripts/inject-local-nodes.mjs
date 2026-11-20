@@ -243,14 +243,18 @@ function resolveLocalItem(item, index) {
   return { proxy: item, link: null, converted: false };
 }
 
-const dec = (s) => {
+// 注意：本段在文件末尾、却在第 1 步就被调用 —— 只能用 function 声明（会提升），
+// 写成 const 会在调用时处于暂时性死区（Cannot access … before initialization）
+function dec(s) {
   try {
     return decodeURIComponent(s);
   } catch {
     return s;
   }
-};
-const truthy = (s) => /^(1|t|true)$/i.test(s || '');
+}
+function truthy(s) {
+  return /^(1|t|true)$/i.test(s || '');
+}
 function b64decode(s) {
   let t = String(s).trim().replace(/-/g, '+').replace(/_/g, '/');
   t += '='.repeat((4 - (t.length % 4)) % 4);
@@ -286,7 +290,9 @@ function parseUrl(line) {
     pass: u.password === '' ? undefined : dec(u.password),
   };
 }
-const nameOf = (p) => p.name || `${p.host}:${p.port}`;
+function nameOf(p) {
+  return p.name || `${p.host}:${p.port}`;
+}
 
 /** vless / vmess(AEAD) 公共部分，对应 mihomo v.go handleVShareLink */
 function vShare(p, type) {
@@ -586,14 +592,18 @@ function parseSS(line) {
 }
 
 // ── 生成方向：节点 → 分享链接（不支持的协议/插件返回 null）──
-const hostFmt = (h) => (String(h).includes(':') ? `[${h}]` : String(h));
+function hostFmt(h) {
+  return String(h).includes(':') ? `[${h}]` : String(h);
+}
 function qs(obj) {
   const s = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) if (v !== undefined && v !== null && v !== '' && v !== false) s.set(k, String(v));
   const t = s.toString();
   return t ? `?${t}` : '';
 }
-const fragOf = (n) => (n ? `#${encodeURIComponent(n)}` : '');
+function fragOf(n) {
+  return n ? `#${encodeURIComponent(n)}` : '';
+}
 function transportParams(p) {
   const ws = p['ws-opts'] || {};
   switch (p.network) {
@@ -706,7 +716,9 @@ function toShareLink(p) {
 }
 
 // ── 回写：链接展开成节点对象；每个节点上方保证有一行「// 链接: …」；其余注释与格式原样保留 ──
-const LINK_COMMENT = /^\/\/\s*链接[:：]/;
+function isLinkComment(line) {
+  return /^\/\/\s*链接[:：]/.test(line);
+}
 
 /** 切出顶层数组的每一项：{ segStart, start, end }（segStart = 上一个逗号之后，含前置注释） */
 function splitArrayItems(text) {
@@ -779,8 +791,8 @@ function rewriteLocalFile(text, resolvedItems) {
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean);
-    const oldLink = lines.find((l) => LINK_COMMENT.test(l));
-    const kept = lines.filter((l) => !LINK_COMMENT.test(l));
+    const oldLink = lines.find(isLinkComment);
+    const kept = lines.filter((l) => !isLinkComment(l));
     let linkLine;
     if (r.link) linkLine = `// 链接: ${r.link}`;
     else if (oldLink) linkLine = oldLink;
