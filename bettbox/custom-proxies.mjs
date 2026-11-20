@@ -8,7 +8,10 @@
  *   1. 在下面数组里填入落地节点（如 ss/vmess/trojan 示例）
  *   2. 推送 → Bettbox 点「更新」→ 重连
  *   3. Bettbox 代理页：`链式中转` 选机场节点；出口选 `落地-…` 节点本身
- *   ⚠️ 公开仓库不要写真凭据，用私有仓库 chaojiman/sr-rules-private 构建
+ *   ⚠️ 公开仓库不要写真凭据。本机节点写在仓库外的 proxies.local.json，
+ *      用 scripts/inject-local-nodes.mjs 拉公开脚本后注入 Bettbox（见该脚本头部说明）。
+ *      direct: true 的节点表示「直连出口」，不会挂 dialer-proxy，可同时出现在
+ *      地区组与「链式中转」里；不带 direct 的节点才会作为链式落地。
  *
  * 不填 = 不使用链式代理，也不会生成「链式中转」/「链式落地」分组
  *
@@ -35,7 +38,6 @@
  *   - 落地节点必须至少 1 个，否则链式关闭、不生成任何链式分组
  */
 export default [
-  // ⚠️ 节点凭据不进公开仓库：真实节点写在私有仓库 chaojiman/sr-rules-private，
-  //    由 .github/workflows/sync-bettbox-private.yml 构建后供 Bettbox 订阅。
-  //    这里保持空数组 → 公开产物不生成链式分组，也不含任何凭据。
+  // ⚠️ 节点凭据不进公开仓库。这里保持空数组 → 公开产物不含任何凭据，也不生成链式分组。
+  //    实际使用的节点放在本机 proxies.local.json，由 scripts/inject-local-nodes.mjs 注入。
 ];

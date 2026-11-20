@@ -712,6 +712,39 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     from: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups });`,
     to: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups, directProxyNames });`,
   },
+
+  // ── 默认出口：按当前实际选择固化 ──
+  // 链式关闭时「链式落地-美国」不存在，selected 会被 includes 检查剔除，自动回退首项。
+  {
+    name: 'AI 默认出口 = 链式落地-美国',
+    required: true,
+    from: `  {
+    name: 'AI',
+    baseOption: selectBaseOption,
+    defaultSelected: '美国',`,
+    to: `  {
+    name: 'AI',
+    baseOption: selectBaseOption,
+    defaultSelected: '链式落地-美国',`,
+  },
+  {
+    name: '默认代理默认选手动选择',
+    required: true,
+    from: `  functionalGroups.push({
+    ...selectBaseOption,
+    name: '默认代理',
+    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],
+    icon: \`\${iconBaseUrl}Proxy.svg\`,
+  });`,
+    to: `  functionalGroups.push({
+    ...selectBaseOption,
+    name: '默认代理',
+    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],
+    icon: \`\${iconBaseUrl}Proxy.svg\`,
+    // 手动选择组存在时才写；关掉该组时回退首项
+    ...(baseGroupNames.includes('手动选择') ? { 'default-selected': '手动选择' } : {}),
+  });`,
+  },
 ];
 
 // ── 执行 ─────────────────────────────────────────────────
