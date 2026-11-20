@@ -32,7 +32,8 @@ function fail(msg) {
 if (!fs.existsSync(LOCAL_FILE)) fail(`找不到节点文件 ${LOCAL_FILE}`);
 let proxies;
 try {
-  proxies = vm.runInNewContext(`(${fs.readFileSync(LOCAL_FILE, 'utf8')})`, {});
+  // 末尾换行：文件最后一行是 // 注释时，也不会把补上的右括号注释掉
+  proxies = vm.runInNewContext(`(${fs.readFileSync(LOCAL_FILE, 'utf8')}\n)`, {});
 } catch (e) {
   fail(`节点文件语法错误：${e.message}`);
 }
