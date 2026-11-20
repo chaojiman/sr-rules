@@ -14,7 +14,7 @@
 import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 
 const REPO_RAW = 'https://raw.githubusercontent.com/chaojiman/sr-rules/main/bettbox/mihomoScript.js';
 const BETTBOX_DIR = path.join(process.env.APPDATA || '', 'com.appshub', 'Bettbox');
@@ -41,7 +41,10 @@ console.log(`  本地节点: ${proxies.length} 个`);
 for (const p of proxies) console.log(`    - ${p.name}`);
 
 // ── 2. 定位 Bettbox 脚本（写入目标，同时是离线源） ──
-// App 重建配置时用的是 config.json 里的脚本内容，运行中改会被覆盖，所以先要求退出
+// App 运行时会覆盖 config.json，所以默认要求退出；--restart 时由脚本自己关掉再拉起
+const RESTART = argv.includes('--restart');
+const appArg = argv.indexOf('--app');
+const APP_EXE = appArg > 0 ? argv[appArg + 1] : '';
 function bettboxRunning() {
   try {
     return execSync('tasklist /FI "IMAGENAME eq Bettbox.exe" /NH', { encoding: 'utf8' }).includes('Bettbox.exe');
@@ -49,8 +52,24 @@ function bettboxRunning() {
     return false;
   }
 }
-if (!process.env.INJECT_SKIP_RUNNING_CHECK && bettboxRunning()) {
-  fail('Bettbox 正在运行。先托盘退出（右下角图标 → 退出），再双击本文件；否则写入会被 App 覆盖');
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// 关闭时机放在写 config.json 之前：拉取还要用 App 提供的 7890 代理
+async function shutdownBettbox() {
+  console.log('  关闭 Bettbox ...');
+  try {
+    execSync('taskkill /IM Bettbox.exe /F /T', { stdio: 'ignore' });
+  } catch {
+    /* 已退出 */
+  }
+  try {
+    execSync('taskkill /IM BettboxCore.exe /F', { stdio: 'ignore' });
+  } catch {
+    /* 已退出 */
+  }
+  for (let i = 0; i < 20 && bettboxRunning(); i += 1) await sleep(300);
+  if (bettboxRunning()) fail('Bettbox 未能关闭，请用任务管理器结束 Bettbox.exe 后重试');
+  console.log('  已关闭');
 }
 
 const cfgPath = path.join(BETTBOX_DIR, 'config.json');
@@ -136,6 +155,12 @@ const backup = (file) => {
 };
 
 const prevUrl = cfg.scriptProps?.scripts?.[0]?.url || '';
+if (!process.env.INJECT_SKIP_RUNNING_CHECK && bettboxRunning()) {
+  if (!RESTART) {
+    fail('Bettbox 正在运行。双击 sync-nodes.cmd 会自动关闭并重启它；单独运行本脚本请先托盘退出');
+  }
+  await shutdownBettbox();
+}
 backup(cfgPath);
 cfg.scriptProps.scripts[0].content = code;
 fs.writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
@@ -152,5 +177,15 @@ if (fs.existsSync(optPath)) {
   }
 }
 
-console.log('\n  完成。启动 Bettbox 会按这份脚本重建配置。');
+console.log('\n  完成。');
+if (RESTART) {
+  if (APP_EXE && fs.existsSync(APP_EXE)) {
+    spawn(APP_EXE, [], { detached: true, stdio: 'ignore', cwd: path.dirname(APP_EXE) }).unref();
+    console.log(`  已启动 ${APP_EXE}`);
+  } else {
+    console.log('  ⚠️ 没找到 Bettbox.exe，请手动启动');
+  }
+} else {
+  console.log('  启动 Bettbox 会按这份脚本重建配置。');
+}
 console.log('  组: 链式落地 / 链式落地-<地区>；链式中转 决定前置。');
