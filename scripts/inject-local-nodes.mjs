@@ -1,15 +1,15 @@
 /**
  * 把本地落地节点注入「Bettbox 当前运行的覆写脚本」
  *
- * 源脚本优先从 GitHub 拉最新（与 Bettbox 点「同步」拿到的是同一份），
- * 拉不到（无代理/被墙）时自动改用 Bettbox 现有的脚本副本，保证离线可用。
+ * 每次运行都先拉 GitHub 最新脚本（与 Bettbox 点「同步」拿到的是同一份），
+ * 再把 proxies.local.json 注入其中；拉取失败直接报错退出，不会用旧脚本糊弄过去。
  *
  * 只替换 `const customizeProxies = [...]` 段，其余逻辑原样保留。
  *
  * 用法:
- *   node scripts/inject-local-nodes.mjs [--proxies <file>] [--local]
+ *   node scripts/inject-local-nodes.mjs [--proxies <file>] [--offline]
  *     --proxies  节点文件，默认仓库根目录 proxies.local.json
- *     --local    不联网，直接用 Bettbox 现有脚本
+ *     --offline  不联网，直接用 Bettbox 现有脚本（临时应急用）
  */
 import fs from 'fs';
 import path from 'path';
@@ -20,7 +20,7 @@ const BETTBOX_DIR = path.join(process.env.APPDATA || '', 'com.appshub', 'Bettbox
 const argv = process.argv;
 const proxiesArg = argv.indexOf('--proxies');
 const LOCAL_FILE = path.resolve(proxiesArg > 0 ? argv[proxiesArg + 1] : 'proxies.local.json');
-const FORCE_LOCAL = argv.includes('--local');
+const OFFLINE = argv.includes('--offline') || argv.includes('--local');
 
 function fail(msg) {
   console.error(`\n  FAILED: ${msg}`);
@@ -48,22 +48,25 @@ if (!script?.id) fail('config.json 里没有启用中的覆写脚本');
 const dst = path.join(BETTBOX_DIR, 'scripts', `${script.id}.js`);
 if (!fs.existsSync(dst)) fail(`找不到 Bettbox 脚本副本 ${dst}（先在 Bettbox 里点一次「同步」）`);
 
-// ── 3. 取源脚本：远程优先，失败回落本地副本 ──
+// ── 3. 取源脚本：默认强制拉 GitHub 最新，--offline 才用本地副本 ──
 let code = null;
-if (FORCE_LOCAL) {
+if (OFFLINE) {
   code = fs.readFileSync(dst, 'utf8');
-  console.log('  源: Bettbox 现有脚本（--local）');
+  console.log('  源: Bettbox 现有脚本（--offline，未联网）');
 } else {
   console.log('  拉取 GitHub 最新脚本 ...');
   try {
-    const res = await fetch(REPO_RAW, { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(REPO_RAW, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     code = await res.text();
-    console.log(`  源: GitHub 最新（${code.length} 字节）`);
   } catch (e) {
-    console.log(`  拉取失败（${e.message}），回落 Bettbox 现有脚本`);
-    code = fs.readFileSync(dst, 'utf8');
+    fail(`拉取失败（${e.message}），脚本未改动。\n  先确保 Bettbox 已连接（7890 代理可用），或加 --offline 跳过联网`);
   }
+  if (!code) fail('拉取结果为空，脚本未改动');
+  const built = code.match(/^\/\/ 生成日期: (.+)$/m)?.[1];
+  const upstream = code.match(/^\/\/ 上游版本: (.+)$/m)?.[1];
+  console.log(`  源: GitHub 最新（${code.length} 字节）`);
+  if (built || upstream) console.log(`  构建: ${built ?? '未知'} / 上游: ${upstream ?? '未知'}`);
 }
 
 // ── 4. 只替换 customizeProxies 段 ──
@@ -106,5 +109,15 @@ fs.copyFileSync(dst, bak);
 fs.writeFileSync(dst, code, 'utf8');
 console.log(`  已备份: ${path.basename(bak)}`);
 console.log(`  已写入: ${dst}`);
-console.log('\n  完成。Bettbox 代理页点「重连」后生效。');
+// ── 7. Bettbox 只在切换/重启配置时重建，检查运行配置是否已跟上 ──
+const profileId = cfg.currentProfileId;
+const cachePath = profileId ? path.join(BETTBOX_DIR, 'relay', `cache-${profileId}.json`) : null;
+const stale = Boolean(cachePath && fs.existsSync(cachePath) && fs.statSync(cachePath).mtimeMs < fs.statSync(dst).mtimeMs);
+console.log('\n  完成。');
+if (stale) {
+  console.log('  ⚠️ Bettbox 运行配置早于本次注入：仅点「重连」不会重跑脚本。');
+  console.log('     托盘退出 Bettbox 后重开（或切换一次配置再切回），新分组才会出现。');
+} else {
+  console.log('  运行配置已是最新，直接重连即可。');
+}
 console.log('  组: 链式落地 / 链式落地-<地区>；链式中转 决定前置。');
