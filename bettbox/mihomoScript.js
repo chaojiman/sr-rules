@@ -1114,6 +1114,12 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
       const { direct, ...rest } = customProxy;
       customProxy = rest;
     }
+    // 未手写 ip-version 时补默认：写死的 IPv6 地址 → ipv6；其余（IPv4 地址/域名）→ ipv4-prefer。
+    // ipv4-prefer 下域名只有 AAAA 时仍会直接走 v6，双栈域名才优先 v4（v6 仅作 300ms 兜底）
+    if (!customProxy['ip-version']) {
+      const isV6Literal = String(customProxy.server ?? '').includes(':');
+      customProxy = { ...customProxy, 'ip-version': isV6Literal ? 'ipv6' : 'ipv4-prefer' };
+    }
     if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }
