@@ -607,6 +607,111 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     ...customRegionGroups,
     ...(chainGroup ? [chainGroup] : []),`,
   },
+
+  // ── direct 自建节点接入地区组与链式中转 ──
+  // 落地节点自带 dialer-proxy，进地区组会「落地 → 链式中转 → 落地」自环，必须继续排除；
+  // direct 节点没有 dialer-proxy，选中只是直连出口，可同时作为链式中转的前置入口。
+  {
+    name: 'direct 节点名单',
+    required: true,
+    from: `  const usedNames = new Set(filteredProxies.map((p) => p.name));
+  const customPrefix = '自建-';
+  const customProxies = [];`,
+    to: `  const usedNames = new Set(filteredProxies.map((p) => p.name));
+  const customPrefix = '自建-';
+  const customProxies = [];
+  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点，链式关闭时全部
+  const directProxyNames = [];`,
+  },
+  {
+    name: '记录 direct 节点',
+    required: true,
+    from: `    if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
+      customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
+    }
+    customProxies.push(customProxy);`,
+    to: `    if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
+      customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
+    }
+    if (!chainEnabled || isDirectNode) directProxyNames.push(customProxy.name);
+    customProxies.push(customProxy);`,
+  },
+  {
+    name: '返回 direct 节点名单',
+    required: true,
+    from: `  return {
+    customProxies,
+    customProxyNames,
+    customGroup,
+    customRegionGroups,
+  };
+}`,
+    to: `  return {
+    customProxies,
+    customProxyNames,
+    customGroup,
+    customRegionGroups,
+    directProxyNames,
+  };
+}`,
+  },
+  {
+    name: '地区组接收 direct 节点',
+    required: true,
+    from: `function buildRegionGroups(filteredProxies, customProxies) {`,
+    to: `function buildRegionGroups(filteredProxies, customProxies, directProxyNames = []) {`,
+  },
+  {
+    name: '地区分组并入 direct 节点',
+    required: true,
+    from: `  // 自建/落地节点只出现在「链式落地」组：它们自带 dialer-proxy，
+  // 若被塞进地区组，选「美国」时可能选中「落地-美国」，导致请求全部走链式而失效。
+  for (const proxy of [...filteredProxies]) {`,
+    to: `  // 落地节点自带 dialer-proxy，进地区组会形成「落地 → 链式中转 → 落地」自环，永远排除；
+  // direct 节点无 dialer-proxy，可安全进入地区组，选中它即直连出口。
+  const regionSourceProxies = [
+    ...filteredProxies,
+    ...customProxies.filter((proxy) => directProxyNames.includes(proxy.name)),
+  ];
+  for (const proxy of regionSourceProxies) {`,
+  },
+  {
+    name: '主流程传入 direct 节点名单',
+    required: true,
+    from: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [] } = buildCustomizeGroups(filteredProxies);`,
+    to: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [] } = buildCustomizeGroups(filteredProxies);`,
+  },
+  {
+    name: '地区组构建接收 direct 节点名单',
+    required: true,
+    from: `    : buildRegionGroups(filteredProxies, customProxies);`,
+    to: `    : buildRegionGroups(filteredProxies, customProxies, directProxyNames);`,
+  },
+  {
+    name: '分流组接收 direct 节点名单',
+    required: true,
+    from: `  const { customProxyNames = [], customGroup = null, customRegionGroups = [] } = customizeInfo || {};`,
+    to: `  const { customProxyNames = [], customGroup = null, customRegionGroups = [], directProxyNames = [] } = customizeInfo || {};`,
+  },
+  {
+    name: '链式中转接入 direct 节点',
+    required: true,
+    from: `          proxies: [
+            ...generatedRegionGroups.filter((g) => g.type === 'url-test').map((g) => g.name),
+            ...filteredProxyNames,
+          ],`,
+    to: `          proxies: [
+            ...generatedRegionGroups.filter((g) => g.type === 'url-test').map((g) => g.name),
+            ...filteredProxyNames,
+            ...directProxyNames,
+          ],`,
+  },
+  {
+    name: '分流组构建传入 direct 节点名单',
+    required: true,
+    from: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups });`,
+    to: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups, directProxyNames });`,
+  },
 ];
 
 // ── 执行 ─────────────────────────────────────────────────
