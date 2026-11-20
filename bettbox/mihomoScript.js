@@ -460,7 +460,7 @@ const serviceConfigs = [
   {
     name: 'AI',
     baseOption: selectBaseOption,
-    defaultSelected: '美国',
+    defaultSelected: '链式落地-美国',
     providers: {
       ai: {
         ...ruleProviderCommonDomain,
@@ -1255,6 +1255,8 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
     name: '默认代理',
     proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],
     icon: `${iconBaseUrl}Proxy.svg`,
+    // 手动选择组存在时才写；关掉该组时回退首项
+    ...(baseGroupNames.includes('手动选择') ? { 'default-selected': '手动选择' } : {}),
   });
 
   // GitHub 在 AI 前：Copilot 全系自然归 GitHub，无需逐条钉规则
