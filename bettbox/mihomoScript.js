@@ -1151,17 +1151,6 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     icon: `${iconBaseUrl}Server.svg`,
   };
 
-  // 2 个及以上落地的组，首项放一个 url-test 子组：新设备没有选择记忆时默认选它（延迟最低，全部超时选第一个）；
-  // 手动选过就按 App/内核的选择记忆走，不会被覆盖
-  const chainAutoGroups = [];
-  const withAutoFirst = (groupName, proxies) => {
-    if (proxies.length < 2) return proxies;
-    const autoName = `${groupName}-自动选择`;
-    chainAutoGroups.push({ ...urlTestBaseOption, name: autoName, proxies });
-    return [autoName, ...proxies];
-  };
-  if (chainEnabled) customGroup.proxies = withAutoFirst(customGroup.name, customGroup.proxies);
-
   // 按落地节点名字里的地区自动生成子组（链式落地-日本 / 链式落地-美国 …）
   const regionBuckets = {};
   if (chainEnabled) {
@@ -1176,7 +1165,7 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const customRegionGroups = Object.entries(regionBuckets).map(([region, proxies]) => ({
     ...selectBaseOption,
     name: `链式落地-${region}`,
-    proxies: withAutoFirst(`链式落地-${region}`, proxies),
+    proxies,
     icon: `${iconBaseUrl}Server.svg`,
   }));
 
@@ -1187,7 +1176,6 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     customRegionGroups,
     directProxyNames,
     relayProxyNames,
-    chainAutoGroups,
   };
 }
 
@@ -2030,7 +2018,7 @@ function main(config) {
 
   const filteredProxies = filterAndNormalizeProxies(config);
 
-  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [], relayProxyNames = [], chainAutoGroups = [] } = buildCustomizeGroups(filteredProxies);
+  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [], relayProxyNames = [] } = buildCustomizeGroups(filteredProxies);
 
   const generatedRegionGroups = ruleOptionsEnable.极简国内外分流模式
     ? []
@@ -2095,7 +2083,6 @@ function main(config) {
     ...functionalGroups,
     ...(customGroup ? [customGroup] : []),
     ...customRegionGroups,
-    ...chainAutoGroups,
     ...(chainGroup ? [chainGroup] : []),
     directGroup,
     ...generatedRegionGroups,

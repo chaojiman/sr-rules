@@ -198,7 +198,7 @@ if (!process.env.INJECT_SKIP_RUNNING_CHECK && bettboxRunning()) {
 backup(cfgPath);
 cfg.scriptProps.scripts[0].content = code;
 // 选择记忆优先：只清掉链式落地组里指向「已删除/改名节点」的记忆（否则 App 一直显示旧名字），有效的照旧保留。
-// 这些组只含本地落地节点和「…-自动选择」子组，所以能逐个判断是否还存在；名字前的国旗由脚本自动加，比对时去掉
+// 这些组只含本地落地节点，所以能逐个判断是否还存在；名字前的国旗由脚本自动加，比对时去掉
 const localNames = new Set(proxies.filter((p) => p.direct !== true).map((p) => p.name)); // 只有真落地会进链式落地组
 const stripFlag = (s) => String(s).replace(/^(?:\p{Regional_Indicator}{2})\s*/u, '');
 for (const profile of cfg.profiles || []) {
@@ -207,7 +207,7 @@ for (const profile of cfg.profiles || []) {
   const stale = Object.keys(map).filter((k) => {
     if (k !== '链式落地' && !k.startsWith('链式落地-')) return false;
     const v = map[k];
-    return !(localNames.has(stripFlag(v)) || (v.startsWith('链式落地') && v.endsWith('-自动选择')));
+    return !localNames.has(stripFlag(v));
   });
   for (const k of stale) delete map[k];
   if (stale.length) console.log(`  已清理「${profile.label ?? profile.id}」失效的选择记忆: ${stale.join('、')}`);

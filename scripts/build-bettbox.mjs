@@ -577,18 +577,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     customGroup,
   };
 }`,
-    to: `  // 2 个及以上落地的组，首项放一个 url-test 子组：新设备没有选择记忆时默认选它（延迟最低，全部超时选第一个）；
-  // 手动选过就按 App/内核的选择记忆走，不会被覆盖
-  const chainAutoGroups = [];
-  const withAutoFirst = (groupName, proxies) => {
-    if (proxies.length < 2) return proxies;
-    const autoName = \`\${groupName}-自动选择\`;
-    chainAutoGroups.push({ ...urlTestBaseOption, name: autoName, proxies });
-    return [autoName, ...proxies];
-  };
-  if (chainEnabled) customGroup.proxies = withAutoFirst(customGroup.name, customGroup.proxies);
-
-  // 按落地节点名字里的地区自动生成子组（链式落地-日本 / 链式落地-美国 …）
+    to: `  // 按落地节点名字里的地区自动生成子组（链式落地-日本 / 链式落地-美国 …）
   const regionBuckets = {};
   if (chainEnabled) {
     for (const proxy of customProxies) {
@@ -602,7 +591,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
   const customRegionGroups = Object.entries(regionBuckets).map(([region, proxies]) => ({
     ...selectBaseOption,
     name: \`链式落地-\${region}\`,
-    proxies: withAutoFirst(\`链式落地-\${region}\`, proxies),
+    proxies,
     icon: \`\${iconBaseUrl}Server.svg\`,
   }));
 
@@ -648,7 +637,6 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     ...(chainGroup ? [chainGroup] : []),`,
     to: `    ...(customGroup ? [customGroup] : []),
     ...customRegionGroups,
-    ...chainAutoGroups,
     ...(chainGroup ? [chainGroup] : []),`,
   },
 
@@ -703,7 +691,6 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     customRegionGroups,
     directProxyNames,
     relayProxyNames,
-    chainAutoGroups,
   };
 }`,
   },
@@ -731,7 +718,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     name: '主流程传入 direct 节点名单',
     required: true,
     from: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [] } = buildCustomizeGroups(filteredProxies);`,
-    to: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [], relayProxyNames = [], chainAutoGroups = [] } = buildCustomizeGroups(filteredProxies);`,
+    to: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [], relayProxyNames = [] } = buildCustomizeGroups(filteredProxies);`,
   },
   {
     name: '地区组构建接收 direct 节点名单',
