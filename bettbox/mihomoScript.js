@@ -1014,6 +1014,7 @@ function createRegionGroup(name, icon, proxies) {
         name,
         icon,
         proxies: [...proxies, urlTestName],
+        ...(name === '香港' ? { 'default-selected': urlTestName } : {}),
         hidden: hideManualSelectGroupEnabled,
       },
       {
@@ -1096,10 +1097,12 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const usedNames = new Set(filteredProxies.map((p) => p.name));
   const customPrefix = '自建-';
   const customProxies = [];
-  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点（不含 manualOnly），链式关闭时全部
+  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点（不含 relay），链式关闭时全部
   const directProxyNames = [];
   // 链式开启时带 dialer-proxy 的落地节点
   const chainLandingNames = [];
+  // relay 中转出口：直接列进默认代理/分流组/漏网之鱼
+  const relayProxyNames = [];
 
   for (const proxy of customizeList) {
     const normalized = normalizeProxyName(proxy);
@@ -1116,11 +1119,11 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
       const { direct, ...rest } = customProxy;
       customProxy = rest;
     }
-    // manualOnly: true（仅对 direct 节点生效）= 只进「手动选择」等全量组，如 HK realm 透传出口：
-    // 不进地区组（地区自动组是链式中转候选，会形成嵌套中转）、不进链式中转、不进链式落地。同样从产物剥掉
-    const isManualOnly = isDirectNode && customProxy.manualOnly === true;
-    if ('manualOnly' in customProxy) {
-      const { manualOnly, ...rest } = customProxy;
+    // relay: true（仅对 direct 节点生效）= 中转出口，如 HK realm 透传：不进地区组（地区自动组是链式中转候选，
+    // 会形成嵌套中转）、不进链式中转、不进链式落地；直接列进默认代理/分流组/漏网之鱼，各组可单独选。同样从产物剥掉
+    const isRelayNode = isDirectNode && customProxy.relay === true;
+    if ('relay' in customProxy) {
+      const { relay, ...rest } = customProxy;
       customProxy = rest;
     }
     // 未手写 ip-version 时补默认：写死的 IPv6 地址 → ipv6；其余（IPv4 地址/域名）→ ipv4-prefer。
@@ -1133,14 +1136,15 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }
     if (chainEnabled && !isDirectNode) chainLandingNames.push(customProxy.name);
-    else if (!isManualOnly) directProxyNames.push(customProxy.name);
+    else if (isRelayNode) relayProxyNames.push(customProxy.name);
+    else directProxyNames.push(customProxy.name);
     customProxies.push(customProxy);
   }
 
   const customProxyNames = customProxies.map((p) => p.name);
 
   const customGroup = {
-    ...selectBaseOption,
+    ...(chainEnabled ? { ...urlTestBaseOption, hidden: false } : selectBaseOption),
     // 名字只跟链式开关走：开着就叫「链式落地」，关着叫「自建节点」
     name: chainEnabled ? '链式落地' : '自建节点',
     proxies: chainEnabled ? chainLandingNames : customProxyNames,
@@ -1159,7 +1163,9 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     }
   }
   const customRegionGroups = Object.entries(regionBuckets).map(([region, proxies]) => ({
-    ...selectBaseOption,
+    // url-test：默认选延迟最低；全部超时回落第一个
+    ...urlTestBaseOption,
+    hidden: false,
     name: `链式落地-${region}`,
     proxies,
     icon: `${iconBaseUrl}Server.svg`,
@@ -1171,6 +1177,7 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     customGroup,
     customRegionGroups,
     directProxyNames,
+    relayProxyNames,
   };
 }
 
@@ -1191,7 +1198,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   const priorityRules = [];
   const finalRuleProviders = { ...baseRuleProviders };
 
-  const { customProxyNames = [], customGroup = null, customRegionGroups = [], directProxyNames = [] } = customizeInfo || {};
+  const { customProxyNames = [], customGroup = null, customRegionGroups = [], directProxyNames = [], relayProxyNames = [] } = customizeInfo || {};
   const filteredProxyNames = filteredProxies.map((p) => p.name);
   const allProxiesNames = [...filteredProxyNames, ...customProxyNames];
   const groupNamesOfSelect = generatedRegionGroups.filter((g) => g.type === 'select').map((g) => g.name);
@@ -1271,7 +1278,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   functionalGroups.push({
     ...selectBaseOption,
     name: '默认代理',
-    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],
+    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames, ...relayProxyNames],
     icon: `${iconBaseUrl}Proxy.svg`,
     // 手动选择组存在时才写；关掉该组时回退首项
     ...(baseGroupNames.includes('手动选择') ? { 'default-selected': '手动选择' } : {}),
@@ -1314,6 +1321,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
         : [
             '默认代理',
             ...customGroupNames,
+            ...relayProxyNames,
             ...baseGroupNames,
             ...groupNamesOfSelect,
             ...(addAllNodesToServiceGroupsEnabled ? allProxiesNames : []),
@@ -1334,7 +1342,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   functionalGroups.push({
     ...selectBaseOption,
     name: '漏网之鱼',
-    proxies: ['默认代理', '直连', ...customGroupNames, ...baseGroupNames, ...groupNamesOfSelect],
+    proxies: ['默认代理', '直连', ...customGroupNames, ...relayProxyNames, ...baseGroupNames, ...groupNamesOfSelect],
     icon: `${iconBaseUrl}Stack.svg`,
   });
 
@@ -2012,7 +2020,7 @@ function main(config) {
 
   const filteredProxies = filterAndNormalizeProxies(config);
 
-  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [] } = buildCustomizeGroups(filteredProxies);
+  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [], relayProxyNames = [] } = buildCustomizeGroups(filteredProxies);
 
   const generatedRegionGroups = ruleOptionsEnable.极简国内外分流模式
     ? []
@@ -2027,7 +2035,7 @@ function main(config) {
     finalRuleProviders,
     chainGroup,
     directGroup,
-  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups, directProxyNames });
+  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups, directProxyNames, relayProxyNames });
 
   const { dns, hosts, proxies: mappedProxies } = buildDnsAndHostsConfig(config, filteredProxies);
 

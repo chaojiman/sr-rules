@@ -197,6 +197,19 @@ if (!process.env.INJECT_SKIP_RUNNING_CHECK && bettboxRunning()) {
 }
 backup(cfgPath);
 cfg.scriptProps.scripts[0].content = code;
+// 自动测速组（链式落地 / 链式落地-地区）删掉记忆选择，香港组回到「香港-自动选择」：
+// App 会把 selectedMap 里的旧选择重新套上去，不清掉就会停在已删除/改名的旧节点上
+for (const profile of cfg.profiles || []) {
+  if (profile.scriptId !== script.id || !profile.selectedMap) continue;
+  const map = profile.selectedMap;
+  const reset = Object.keys(map).filter((k) => k === '链式落地' || k.startsWith('链式落地-'));
+  for (const k of reset) delete map[k];
+  if ('香港' in map && map['香港'] !== '香港-自动选择') {
+    map['香港'] = '香港-自动选择';
+    reset.push('香港');
+  }
+  if (reset.length) console.log(`  已重置「${profile.label ?? profile.id}」的分组选择: ${reset.join('、')}`);
+}
 fs.writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
 console.log(`  已写入 config.json 脚本内容（原 url: ${prevUrl || '无'}）`);
 

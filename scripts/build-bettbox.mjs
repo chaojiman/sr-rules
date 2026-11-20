@@ -420,11 +420,11 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
       const { direct, ...rest } = customProxy;
       customProxy = rest;
     }
-    // manualOnly: true（仅对 direct 节点生效）= 只进「手动选择」等全量组，如 HK realm 透传出口：
-    // 不进地区组（地区自动组是链式中转候选，会形成嵌套中转）、不进链式中转、不进链式落地。同样从产物剥掉
-    const isManualOnly = isDirectNode && customProxy.manualOnly === true;
-    if ('manualOnly' in customProxy) {
-      const { manualOnly, ...rest } = customProxy;
+    // relay: true（仅对 direct 节点生效）= 中转出口，如 HK realm 透传：不进地区组（地区自动组是链式中转候选，
+    // 会形成嵌套中转）、不进链式中转、不进链式落地；直接列进默认代理/分流组/漏网之鱼，各组可单独选。同样从产物剥掉
+    const isRelayNode = isDirectNode && customProxy.relay === true;
+    if ('relay' in customProxy) {
+      const { relay, ...rest } = customProxy;
       customProxy = rest;
     }
     // 未手写 ip-version 时补默认：写死的 IPv6 地址 → ipv6；其余（IPv4 地址/域名）→ ipv4-prefer。
@@ -437,20 +437,17 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }`,
   },
+  // 链式开启时「链式落地」只收带 dialer-proxy 的真落地（direct 前置/直连出口/中转出口不进），
+  // 并改成 url-test：默认选延迟最低的；全部超时 mihomo 回落到第一个，不会停在已删除的旧节点上
   {
-    name: '组名固定为链式落地',
-    required: false,
-    from: `    name: chainEnabled ? '链式落地' : '自建节点',`,
-    to: `    // 名字只跟链式开关走：开着就叫「链式落地」，关着叫「自建节点」
-    name: chainEnabled ? '链式落地' : '自建节点',`,
-  },
-  // 链式开启时「链式落地」只收带 dialer-proxy 的真落地；direct 节点（前置/直连出口/realm 出口）不进
-  {
-    name: '链式落地只收真落地',
+    name: '链式落地只收真落地+自动测速',
     required: true,
-    from: `    name: chainEnabled ? '链式落地' : '自建节点',
+    from: `    ...selectBaseOption,
+    name: chainEnabled ? '链式落地' : '自建节点',
     proxies: customProxyNames,`,
-    to: `    name: chainEnabled ? '链式落地' : '自建节点',
+    to: `    ...(chainEnabled ? { ...urlTestBaseOption, hidden: false } : selectBaseOption),
+    // 名字只跟链式开关走：开着就叫「链式落地」，关着叫「自建节点」
+    name: chainEnabled ? '链式落地' : '自建节点',
     proxies: chainEnabled ? chainLandingNames : customProxyNames,`,
   },
 
@@ -526,7 +523,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     required: false,
     from: `    proxies: ['默认代理', '直连', ...groupNamesOfSelect],
     icon: \`\${iconBaseUrl}Stack.svg\`,`,
-    to: `    proxies: ['默认代理', '直连', ...customGroupNames, ...baseGroupNames, ...groupNamesOfSelect],
+    to: `    proxies: ['默认代理', '直连', ...customGroupNames, ...relayProxyNames, ...baseGroupNames, ...groupNamesOfSelect],
     icon: \`\${iconBaseUrl}Stack.svg\`,`,
   },
 
@@ -593,7 +590,9 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     }
   }
   const customRegionGroups = Object.entries(regionBuckets).map(([region, proxies]) => ({
-    ...selectBaseOption,
+    // url-test：默认选延迟最低；全部超时回落第一个
+    ...urlTestBaseOption,
+    hidden: false,
     name: \`链式落地-\${region}\`,
     proxies,
     icon: \`\${iconBaseUrl}Server.svg\`,
@@ -656,10 +655,12 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     to: `  const usedNames = new Set(filteredProxies.map((p) => p.name));
   const customPrefix = '自建-';
   const customProxies = [];
-  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点（不含 manualOnly），链式关闭时全部
+  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点（不含 relay），链式关闭时全部
   const directProxyNames = [];
   // 链式开启时带 dialer-proxy 的落地节点
-  const chainLandingNames = [];`,
+  const chainLandingNames = [];
+  // relay 中转出口：直接列进默认代理/分流组/漏网之鱼
+  const relayProxyNames = [];`,
   },
   {
     name: '记录 direct 节点',
@@ -672,7 +673,8 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }
     if (chainEnabled && !isDirectNode) chainLandingNames.push(customProxy.name);
-    else if (!isManualOnly) directProxyNames.push(customProxy.name);
+    else if (isRelayNode) relayProxyNames.push(customProxy.name);
+    else directProxyNames.push(customProxy.name);
     customProxies.push(customProxy);`,
   },
   {
@@ -691,6 +693,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     customGroup,
     customRegionGroups,
     directProxyNames,
+    relayProxyNames,
   };
 }`,
   },
@@ -718,7 +721,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     name: '主流程传入 direct 节点名单',
     required: true,
     from: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [] } = buildCustomizeGroups(filteredProxies);`,
-    to: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [] } = buildCustomizeGroups(filteredProxies);`,
+    to: `  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [], relayProxyNames = [] } = buildCustomizeGroups(filteredProxies);`,
   },
   {
     name: '地区组构建接收 direct 节点名单',
@@ -730,7 +733,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     name: '分流组接收 direct 节点名单',
     required: true,
     from: `  const { customProxyNames = [], customGroup = null, customRegionGroups = [] } = customizeInfo || {};`,
-    to: `  const { customProxyNames = [], customGroup = null, customRegionGroups = [], directProxyNames = [] } = customizeInfo || {};`,
+    to: `  const { customProxyNames = [], customGroup = null, customRegionGroups = [], directProxyNames = [], relayProxyNames = [] } = customizeInfo || {};`,
   },
   {
     name: '链式中转接入 direct 节点',
@@ -749,7 +752,29 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     name: '分流组构建传入 direct 节点名单',
     required: true,
     from: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups });`,
-    to: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups, directProxyNames });`,
+    to: `} = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups, directProxyNames, relayProxyNames });`,
+  },
+  {
+    name: '分流组接入 relay 中转出口',
+    required: true,
+    from: `            '默认代理',
+            ...customGroupNames,
+            ...baseGroupNames,`,
+    to: `            '默认代理',
+            ...customGroupNames,
+            ...relayProxyNames,
+            ...baseGroupNames,`,
+  },
+
+  // ── 香港地区手动组默认选「香港-自动选择」──
+  {
+    name: '香港组默认自动选择',
+    required: true,
+    from: `        proxies: [...proxies, urlTestName],
+        hidden: hideManualSelectGroupEnabled,`,
+    to: `        proxies: [...proxies, urlTestName],
+        ...(name === '香港' ? { 'default-selected': urlTestName } : {}),
+        hidden: hideManualSelectGroupEnabled,`,
   },
 
   // ── 默认出口：按当前实际选择固化 ──
@@ -778,7 +803,7 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     to: `  functionalGroups.push({
     ...selectBaseOption,
     name: '默认代理',
-    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames],
+    proxies: [...groupNamesOfSelect, ...baseGroupNames, ...customGroupNames, ...relayProxyNames],
     icon: \`\${iconBaseUrl}Proxy.svg\`,
     // 手动选择组存在时才写；关掉该组时回退首项
     ...(baseGroupNames.includes('手动选择') ? { 'default-selected': '手动选择' } : {}),
