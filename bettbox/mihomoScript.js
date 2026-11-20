@@ -1096,8 +1096,10 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const usedNames = new Set(filteredProxies.map((p) => p.name));
   const customPrefix = '自建-';
   const customProxies = [];
-  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点，链式关闭时全部
+  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点（不含 manualOnly），链式关闭时全部
   const directProxyNames = [];
+  // 链式开启时带 dialer-proxy 的落地节点
+  const chainLandingNames = [];
 
   for (const proxy of customizeList) {
     const normalized = normalizeProxyName(proxy);
@@ -1114,6 +1116,13 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
       const { direct, ...rest } = customProxy;
       customProxy = rest;
     }
+    // manualOnly: true（仅对 direct 节点生效）= 只进「手动选择」等全量组，如 HK realm 透传出口：
+    // 不进地区组（地区自动组是链式中转候选，会形成嵌套中转）、不进链式中转、不进链式落地。同样从产物剥掉
+    const isManualOnly = isDirectNode && customProxy.manualOnly === true;
+    if ('manualOnly' in customProxy) {
+      const { manualOnly, ...rest } = customProxy;
+      customProxy = rest;
+    }
     // 未手写 ip-version 时补默认：写死的 IPv6 地址 → ipv6；其余（IPv4 地址/域名）→ ipv4-prefer。
     // ipv4-prefer 下域名只有 AAAA 时仍会直接走 v6，双栈域名才优先 v4（v6 仅作 300ms 兜底）
     if (!customProxy['ip-version']) {
@@ -1123,7 +1132,8 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }
-    if (!chainEnabled || isDirectNode) directProxyNames.push(customProxy.name);
+    if (chainEnabled && !isDirectNode) chainLandingNames.push(customProxy.name);
+    else if (!isManualOnly) directProxyNames.push(customProxy.name);
     customProxies.push(customProxy);
   }
 
@@ -1131,9 +1141,9 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
 
   const customGroup = {
     ...selectBaseOption,
-    // 名字只跟链式开关走：开着就叫「链式落地」（可能混有 direct 节点），关着叫「自建节点」
+    // 名字只跟链式开关走：开着就叫「链式落地」，关着叫「自建节点」
     name: chainEnabled ? '链式落地' : '自建节点',
-    proxies: customProxyNames,
+    proxies: chainEnabled ? chainLandingNames : customProxyNames,
     icon: `${iconBaseUrl}Server.svg`,
   };
 
@@ -1141,6 +1151,8 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const regionBuckets = {};
   if (chainEnabled) {
     for (const proxy of customProxies) {
+      // 只按真落地分组：direct 节点不进「链式落地-地区」
+      if (!chainLandingNames.includes(proxy.name)) continue;
       for (const region of getMatchedRegions(proxy.name)) {
         (regionBuckets[region.name] ||= []).push(proxy.name);
       }

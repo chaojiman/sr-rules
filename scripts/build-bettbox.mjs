@@ -420,6 +420,13 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
       const { direct, ...rest } = customProxy;
       customProxy = rest;
     }
+    // manualOnly: true（仅对 direct 节点生效）= 只进「手动选择」等全量组，如 HK realm 透传出口：
+    // 不进地区组（地区自动组是链式中转候选，会形成嵌套中转）、不进链式中转、不进链式落地。同样从产物剥掉
+    const isManualOnly = isDirectNode && customProxy.manualOnly === true;
+    if ('manualOnly' in customProxy) {
+      const { manualOnly, ...rest } = customProxy;
+      customProxy = rest;
+    }
     // 未手写 ip-version 时补默认：写死的 IPv6 地址 → ipv6；其余（IPv4 地址/域名）→ ipv4-prefer。
     // ipv4-prefer 下域名只有 AAAA 时仍会直接走 v6，双栈域名才优先 v4（v6 仅作 300ms 兜底）
     if (!customProxy['ip-version']) {
@@ -434,8 +441,17 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     name: '组名固定为链式落地',
     required: false,
     from: `    name: chainEnabled ? '链式落地' : '自建节点',`,
-    to: `    // 名字只跟链式开关走：开着就叫「链式落地」（可能混有 direct 节点），关着叫「自建节点」
+    to: `    // 名字只跟链式开关走：开着就叫「链式落地」，关着叫「自建节点」
     name: chainEnabled ? '链式落地' : '自建节点',`,
+  },
+  // 链式开启时「链式落地」只收带 dialer-proxy 的真落地；direct 节点（前置/直连出口/realm 出口）不进
+  {
+    name: '链式落地只收真落地',
+    required: true,
+    from: `    name: chainEnabled ? '链式落地' : '自建节点',
+    proxies: customProxyNames,`,
+    to: `    name: chainEnabled ? '链式落地' : '自建节点',
+    proxies: chainEnabled ? chainLandingNames : customProxyNames,`,
   },
 
   // ── 必需：链式中转接入地区自动组（前置可自动切换）──
@@ -569,6 +585,8 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
   const regionBuckets = {};
   if (chainEnabled) {
     for (const proxy of customProxies) {
+      // 只按真落地分组：direct 节点不进「链式落地-地区」
+      if (!chainLandingNames.includes(proxy.name)) continue;
       for (const region of getMatchedRegions(proxy.name)) {
         (regionBuckets[region.name] ||= []).push(proxy.name);
       }
@@ -638,8 +656,10 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     to: `  const usedNames = new Set(filteredProxies.map((p) => p.name));
   const customPrefix = '自建-';
   const customProxies = [];
-  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点，链式关闭时全部
-  const directProxyNames = [];`,
+  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点（不含 manualOnly），链式关闭时全部
+  const directProxyNames = [];
+  // 链式开启时带 dialer-proxy 的落地节点
+  const chainLandingNames = [];`,
   },
   {
     name: '记录 direct 节点',
@@ -651,7 +671,8 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
     to: `    if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }
-    if (!chainEnabled || isDirectNode) directProxyNames.push(customProxy.name);
+    if (chainEnabled && !isDirectNode) chainLandingNames.push(customProxy.name);
+    else if (!isManualOnly) directProxyNames.push(customProxy.name);
     customProxies.push(customProxy);`,
   },
   {
