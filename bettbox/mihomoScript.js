@@ -1,5 +1,5 @@
 // ══════════ sr-rules 构建标记（自动生成，勿手改）══════════
-// 生成日期: 2026-11-19
+// 生成日期: 2026-11-20
 // 上游脚本: https://raw.githubusercontent.com/AIsouler/MyClash/main/Script/mihomoScript.js
 // 上游版本: etag 3c4572a2d6f0…
 // 上游提交: 858e336 @ 2026-11-18T10:49:01Z
@@ -1037,16 +1037,20 @@ function createRegionGroup(name, icon, proxies) {
 /**
  * 将节点按地区/倍率归类，构建地区策略组、倍率策略组与“其他节点”组
  */
-function buildRegionGroups(filteredProxies, customProxies) {
+function buildRegionGroups(filteredProxies, customProxies, directProxyNames = []) {
   const generateRateGroupEnabled = ruleOptionsEnable.生成高低倍率组;
   const generateHomeGroupEnabled = ruleOptionsEnable.生成家宽节点组;
 
   const regionGroups = Object.fromEntries(allRegionDefinitions.map(({ name }) => [name, []]));
   const otherProxies = [];
 
-  // 自建/落地节点只出现在「链式落地」组：它们自带 dialer-proxy，
-  // 若被塞进地区组，选「美国」时可能选中「落地-美国」，导致请求全部走链式而失效。
-  for (const proxy of [...filteredProxies]) {
+  // 落地节点自带 dialer-proxy，进地区组会形成「落地 → 链式中转 → 落地」自环，永远排除；
+  // direct 节点无 dialer-proxy，可安全进入地区组，选中它即直连出口。
+  const regionSourceProxies = [
+    ...filteredProxies,
+    ...customProxies.filter((proxy) => directProxyNames.includes(proxy.name)),
+  ];
+  for (const proxy of regionSourceProxies) {
     const matchedRegions = getMatchedRegions(proxy.name);
     const isRegionProxy = matchedRegions.some((region) => regionDefinitions.includes(region));
 
@@ -1092,6 +1096,8 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
   const usedNames = new Set(filteredProxies.map((p) => p.name));
   const customPrefix = '自建-';
   const customProxies = [];
+  // 无 dialer-proxy 的自建节点：链式开启时只有 direct 节点，链式关闭时全部
+  const directProxyNames = [];
 
   for (const proxy of customizeList) {
     const normalized = normalizeProxyName(proxy);
@@ -1111,6 +1117,7 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     if (chainEnabled && !isDirectNode && customProxy['dialer-proxy'] !== dialerProxyName) {
       customProxy = { ...customProxy, 'dialer-proxy': dialerProxyName };
     }
+    if (!chainEnabled || isDirectNode) directProxyNames.push(customProxy.name);
     customProxies.push(customProxy);
   }
 
@@ -1145,6 +1152,7 @@ function buildCustomizeGroups(filteredProxies, customizeList = customizeProxies)
     customProxyNames,
     customGroup,
     customRegionGroups,
+    directProxyNames,
   };
 }
 
@@ -1165,7 +1173,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
   const priorityRules = [];
   const finalRuleProviders = { ...baseRuleProviders };
 
-  const { customProxyNames = [], customGroup = null, customRegionGroups = [] } = customizeInfo || {};
+  const { customProxyNames = [], customGroup = null, customRegionGroups = [], directProxyNames = [] } = customizeInfo || {};
   const filteredProxyNames = filteredProxies.map((p) => p.name);
   const allProxiesNames = [...filteredProxyNames, ...customProxyNames];
   const groupNamesOfSelect = generatedRegionGroups.filter((g) => g.type === 'select').map((g) => g.name);
@@ -1184,6 +1192,7 @@ function buildFunctionalGroups(filteredProxies, generatedRegionGroups, customize
           proxies: [
             ...generatedRegionGroups.filter((g) => g.type === 'url-test').map((g) => g.name),
             ...filteredProxyNames,
+            ...directProxyNames,
           ],
           icon: `${iconBaseUrl}Bypass.svg`,
         }
@@ -1983,11 +1992,11 @@ function main(config) {
 
   const filteredProxies = filterAndNormalizeProxies(config);
 
-  const { customProxies, customProxyNames, customGroup, customRegionGroups = [] } = buildCustomizeGroups(filteredProxies);
+  const { customProxies, customProxyNames, customGroup, customRegionGroups = [], directProxyNames = [] } = buildCustomizeGroups(filteredProxies);
 
   const generatedRegionGroups = ruleOptionsEnable.极简国内外分流模式
     ? []
-    : buildRegionGroups(filteredProxies, customProxies);
+    : buildRegionGroups(filteredProxies, customProxies, directProxyNames);
 
   const {
     globalGroup,
@@ -1998,7 +2007,7 @@ function main(config) {
     finalRuleProviders,
     chainGroup,
     directGroup,
-  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups });
+  } = buildFunctionalGroups(filteredProxies, generatedRegionGroups, { customProxyNames, customGroup, customRegionGroups, directProxyNames });
 
   const { dns, hosts, proxies: mappedProxies } = buildDnsAndHostsConfig(config, filteredProxies);
 
