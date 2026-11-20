@@ -360,7 +360,7 @@ const selectBaseOption = {
 const urlTestBaseOption = {
   ...groupBaseOption,
   type: 'url-test',
-  interval: 600,
+  interval: 500,
   lazy: true,
   tolerance: 50,
   'exclude-type': 'DIRECT',

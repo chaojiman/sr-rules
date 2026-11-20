@@ -774,6 +774,17 @@ ruleOptionsEnable.链式代理 = customizeProxies.some((p) => p.direct !== true)
         hidden: hideManualSelectGroupEnabled,`,
   },
 
+  // ── 自动选择组测速间隔 600 → 500 秒 ──
+  // 实际流量连续失败 max-failed-times(3) 次会立即触发一次测速并切换，不必等间隔
+  {
+    name: '自动测速间隔 500 秒',
+    required: true,
+    from: `  type: 'url-test',
+  interval: 600,`,
+    to: `  type: 'url-test',
+  interval: 500,`,
+  },
+
   // ── 默认出口：按当前实际选择固化 ──
   // 链式关闭时「链式落地-美国」不存在，selected 会被 includes 检查剔除，自动回退首项。
   {
